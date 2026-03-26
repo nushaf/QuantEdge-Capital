@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us - QuantEdge Capital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/tailwind-config.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-dark text-white font-sans bg-mesh overflow-x-hidden min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="fixed w-full z-50 glass border-b border-gray-800" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-neonBlue shadow-[0_0_15px_rgba(0,243,255,0.5)] flex items-center justify-center text-darker font-bold pr-1 text-xl">Q</span>
+                <span class="font-display font-bold text-2xl tracking-tight">QuantEdge<span class="text-neonBlue">.</span></span>
+            </a>
+            
+            <div class="hidden md:flex items-center gap-8">
+                <a href="index.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Home</a>
+                <a href="about.html" class="text-white font-medium hover:text-neonBlue transition-colors text-sm">About Us</a>
+                <a href="services.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Services</a>
+                <a href="markets.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Markets</a>
+                <a href="trust.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Trust & Security</a>
+                <a href="contact.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Contact</a>
+            </div>
+
+            <div class="hidden md:flex items-center gap-4">
+                <a href="auth.html" class="text-gray-300 hover:text-white font-medium text-sm px-4 py-2">Log In</a>
+                <a href="auth.html" class="bg-neonBlue text-darker font-bold text-sm px-6 py-2.5 rounded-full hover:shadow-[0_0_20px_rgba(0,243,255,0.4)] transition-all">Open Account</a>
+            </div>
+
+            <button id="mobile-menu-btn" class="md:hidden text-white p-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden glass border-t border-gray-800 absolute w-full left-0 top-20 flex flex-col px-6 py-4 gap-4">
+            <a href="index.html" class="text-gray-400 hover:text-white">Home</a>
+            <a href="about.html" class="text-white hover:text-neonBlue">About Us</a>
+            <a href="services.html" class="text-gray-400 hover:text-white">Services</a>
+            <a href="markets.html" class="text-gray-400 hover:text-white">Markets</a>
+            <a href="trust.html" class="text-gray-400 hover:text-white">Trust & Security</a>
+            <a href="contact.html" class="text-gray-400 hover:text-white">Contact</a>
+            <div class="h-px bg-gray-800 w-full my-2"></div>
+            <a href="auth.html" class="text-gray-300">Log In</a>
+            <a href="auth.html" class="text-neonBlue font-bold">Open Account</a>
+        </div>
+    </nav>
+
+    <!-- Page Content -->
+    <main class="flex-1 mt-20 pt-16 pb-24">
+        
+        <!-- Header -->
+        <div class="max-w-4xl mx-auto px-6 text-center mb-24 reveal">
+            <h1 class="text-4xl md:text-6xl font-display font-bold mb-6 text-glow-blue">Who Is QuantEdge Capital?</h1>
+            <p class="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">
+                We are a globally recognized multi-asset brokerage, bridging the gap between retail traders and institutional-grade liquidity using state-of-the-art algorithmic platforms.
+            </p>
+        </div>
+
+        <!-- Vision & Mission -->
+        <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-10 mb-32">
+            <div class="glass-panel p-10 rounded-3xl glow-blue reveal relative overflow-hidden group">
+                <div class="absolute -right-20 -top-20 w-64 h-64 bg-neonBlue/10 rounded-full blur-3xl group-hover:bg-neonBlue/20 transition-all duration-700"></div>
+                <svg class="w-12 h-12 text-neonBlue mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                <h2 class="text-2xl font-display font-bold mb-4">Our Vision</h2>
+                <p class="text-gray-400 leading-relaxed">To democratize access to global financial markets by providing every trader, regardless of experience, with the sophisticated tools, tight spreads, and execution speed normally reserved for Wall Street professionals.</p>
+            </div>
+            
+            <div class="glass-panel p-10 rounded-3xl glow-green reveal relative overflow-hidden group">
+                <div class="absolute -right-20 -top-20 w-64 h-64 bg-neonGreen/10 rounded-full blur-3xl group-hover:bg-neonGreen/20 transition-all duration-700"></div>
+                <svg class="w-12 h-12 text-neonGreen mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <h2 class="text-2xl font-display font-bold mb-4">Our Mission</h2>
+                <p class="text-gray-400 leading-relaxed">We constantly innovate to deliver a seamless multi-asset environment. Through our core pillars of Deep Liquidity, Transparent Pricing, and Advanced AI integration, we empower successful trading strategies across the globe.</p>
+            </div>
+        </div>
+
+        <!-- Stats Section (Counters) -->
+        <div class="border-y border-gray-800 bg-gray-900/50 relative py-20 reveal">
+            <div class="max-w-7xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-12 text-center">
+                <div>
+                    <h3 class="text-5xl font-display font-bold text-white mb-2 outfit">15+</h3>
+                    <p class="text-neonBlue text-sm font-bold tracking-widest uppercase">Offices Globally</p>
+                </div>
+                <div>
+                    <h3 class="text-5xl font-display font-bold text-white mb-2 outfit">250+</h3>
+                    <p class="text-neonBlue text-sm font-bold tracking-widest uppercase">Tradeable Assets</p>
+                </div>
+                <div>
+                    <h3 class="text-5xl font-display font-bold text-white mb-2 outfit">99.9%</h3>
+                    <p class="text-neonBlue text-sm font-bold tracking-widest uppercase">System Uptime</p>
+                </div>
+                <div>
+                    <h3 class="text-5xl font-display font-bold text-white mb-2 outfit">24/7</h3>
+                    <p class="text-neonBlue text-sm font-bold tracking-widest uppercase">Expert Support</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-800 bg-black pt-16 pb-8 text-sm text-gray-400">
+        <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+            <div>
+                <a href="index.html" class="flex items-center gap-2 mb-6">
+                    <span class="w-6 h-6 rounded bg-neonBlue flex items-center justify-center text-darker font-bold pr-1">Q</span>
+                    <span class="font-display font-bold text-xl tracking-tight text-white">QuantEdge</span>
+                </a>
+                <p class="leading-relaxed">Advanced trading platform for the modern investor. Secure, fast, and globally accessible.</p>
+            </div>
+            <div>
+                <h4 class="text-white font-bold mb-6">Platform</h4>
+                <ul class="space-y-3">
+                    <li><a href="markets.html" class="hover:text-neonBlue">Markets</a></li>
+                    <li><a href="services.html" class="hover:text-neonBlue">Signal Providing</a></li>
+                    <li><a href="services.html" class="hover:text-neonBlue">Algorithmic Trading</a></li>
+                    <li><a href="services.html" class="hover:text-neonBlue">Copy Trading</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-white font-bold mb-6">Company</h4>
+                <ul class="space-y-3">
+                    <li><a href="about.html" class="hover:text-neonBlue">About Us</a></li>
+                    <li><a href="trust.html" class="hover:text-neonBlue">Trust & Security</a></li>
+                    <li><a href="contact.html" class="hover:text-neonBlue">Contact Support</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-white font-bold mb-6">Legal</h4>
+                <ul class="space-y-3">
+                    <li><a href="#" class="hover:text-neonBlue">Terms & Conditions</a></li>
+                    <li><a href="#" class="hover:text-neonBlue">Privacy Policy</a></li>
+                    <li><a href="#" class="hover:text-neonBlue">Risk Disclosure</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto px-6 text-center border-t border-gray-800 pt-8 text-xs">
+            <p>&copy; 2026 QuantEdge Capital. All rights reserved.</p>
+            <p class="mt-2 text-gray-600">Trading Foreign Exchange (Forex) and Contracts for Differences (CFDs) is highly speculative, carries a high level of risk and may not be suitable for all investors. You may sustain a loss of some or all of your invested capital.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

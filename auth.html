@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantEdge Capital - Auth</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/tailwind-config.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-dark text-white font-sans min-h-screen flex items-center justify-center p-4 bg-mesh">
+
+    <div class="glass-panel w-full max-w-xl rounded-2xl p-8 relative overflow-hidden reveal">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <h1 class="font-display font-bold text-3xl tracking-tight text-white flex items-center justify-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-neonBlue shadow-[0_0_15px_rgba(0,243,255,0.5)] flex items-center justify-center text-darker font-bold">Q</span>
+                QuantEdge<span class="text-neonBlue">.</span>
+            </h1>
+            <h2 id="auth-title" class="text-2xl font-bold mt-4 outfit text-glow-blue">Create Account</h2>
+        </div>
+
+        <form id="register-form" onsubmit="submitForm(event)">
+            <!-- Step 1 -->
+            <div class="auth-step space-y-4" id="step-1">
+                <input type="email" required class="w-full px-4 py-3 rounded-xl" placeholder="Email Address">
+                <input type="password" required class="w-full px-4 py-3 rounded-xl" placeholder="Password">
+                <button type="button" onclick="nextStep()" class="w-full bg-neonBlue text-darker font-bold py-3 rounded-xl">Continue</button>
+            </div>
+            <!-- Step 2 -->
+            <div class="auth-step space-y-4 hidden" id="step-2">
+                <input type="text" required class="w-full px-4 py-3 rounded-xl" placeholder="Full Name">
+                <input type="tel" required class="w-full px-4 py-3 rounded-xl" placeholder="Phone Number">
+                <div class="flex gap-4">
+                    <button type="button" onclick="prevStep()" class="w-1/3 bg-transparent border border-gray-600 rounded-xl">Back</button>
+                    <button type="button" onclick="nextStep()" class="w-2/3 bg-neonBlue text-darker font-bold py-3 rounded-xl">Continue</button>
+                </div>
+            </div>
+            <!-- Step 3 -->
+            <div class="auth-step hidden" id="step-3">
+                <div class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center file-upload-wrapper w-full mb-4">
+                    <input type="file" onchange="showToast('ID Uploaded', 'success')">
+                    <p class="text-gray-400">Upload ID</p>
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" onclick="prevStep()" class="w-1/3 bg-transparent border border-gray-600 rounded-xl">Back</button>
+                    <button type="button" onclick="nextStep()" class="w-2/3 bg-neonBlue text-darker font-bold py-3 rounded-xl">Skip & Continue</button>
+                </div>
+            </div>
+            <!-- Step 4 -->
+            <div class="auth-step hidden" id="step-4">
+                <div class="mb-4 space-y-2">
+                    <label class="block border border-gray-600 p-4 rounded-xl cursor-pointer hover:border-neonGreen"><input type="radio" name="dep" checked> Credit Card</label>
+                    <label class="block border border-gray-600 p-4 rounded-xl cursor-pointer hover:border-neonGold"><input type="radio" name="dep"> Crypto</label>
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" onclick="prevStep()" class="w-1/3 bg-transparent border border-gray-600 rounded-xl">Back</button>
+                    <button type="submit" class="w-2/3 bg-neonBlue text-darker font-bold py-3 rounded-xl">Finish</button>
+                </div>
+            </div>
+            <p class="text-center mt-6 text-sm text-gray-400">Have an account? <span onclick="toggleMode()" class="text-neonBlue cursor-pointer">Log In</span></p>
+        </form>
+
+        <form id="login-form" class="hidden" onsubmit="login(event)">
+            <div class="space-y-4">
+                <input type="email" required class="w-full px-4 py-3 rounded-xl" placeholder="Email">
+                <input type="password" required class="w-full px-4 py-3 rounded-xl" placeholder="Password">
+                <button type="submit" class="w-full bg-neonBlue text-darker font-bold py-3 rounded-xl">Sign In</button>
+            </div>
+            <p class="text-center mt-6 text-sm text-gray-400">Need an account? <span onclick="toggleMode()" class="text-neonBlue cursor-pointer">Sign Up</span></p>
+        </form>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>

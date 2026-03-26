@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantEdge Capital - Trade Global Markets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/tailwind-config.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-dark text-white font-sans bg-mesh overflow-x-hidden min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="fixed w-full z-50 glass border-b border-gray-800 transition-all duration-300" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-neonBlue shadow-[0_0_15px_rgba(0,243,255,0.5)] flex items-center justify-center text-darker font-bold text-xl pr-1">Q</span>
+                <span class="font-display font-bold text-2xl tracking-tight">QuantEdge<span class="text-neonBlue">.</span></span>
+            </a>
+            
+            <div class="hidden md:flex items-center gap-8">
+                <a href="index.html" class="text-white font-medium hover:text-neonBlue transition-colors text-sm">Home</a>
+                <a href="about.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">About Us</a>
+                <a href="services.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Services</a>
+                <a href="markets.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Markets</a>
+                <a href="trust.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Trust & Security</a>
+                <a href="contact.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Contact</a>
+            </div>
+
+            <div class="hidden md:flex items-center gap-4">
+                <a href="auth.html" class="text-gray-300 hover:text-white font-medium text-sm px-4 py-2 transition-colors">Log In</a>
+                <a href="auth.html" class="bg-neonBlue text-darker font-bold text-sm px-6 py-2.5 rounded-full hover:shadow-[0_0_20px_rgba(0,243,255,0.4)] transition-all">Open Account</a>
+            </div>
+
+            <button id="mobile-menu-btn" class="md:hidden text-white p-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden glass border-t border-gray-800 absolute w-full left-0 top-20 flex flex-col px-6 py-4 gap-4">
+            <a href="index.html" class="text-white hover:text-neonBlue">Home</a>
+            <a href="about.html" class="text-gray-400 hover:text-white">About Us</a>
+            <a href="services.html" class="text-gray-400 hover:text-white">Services</a>
+            <a href="markets.html" class="text-gray-400 hover:text-white">Markets</a>
+            <a href="trust.html" class="text-gray-400 hover:text-white">Trust & Security</a>
+            <a href="contact.html" class="text-gray-400 hover:text-white">Contact</a>
+            <div class="h-px bg-gray-800 w-full my-2"></div>
+            <a href="auth.html" class="text-gray-300">Log In</a>
+            <a href="auth.html" class="text-neonBlue font-bold">Open Account</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <main class="flex-1 mt-20 relative flex items-center pt-20 pb-32 overflow-hidden">
+        <!-- Floating Elements Background -->
+        <div class="absolute inset-0 z-0 pointer-events-none opacity-40">
+            <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-neonBlue rounded-full mix-blend-screen filter blur-[150px] animate-pulse"></div>
+            <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-neonGreen rounded-full mix-blend-screen filter blur-[150px] animate-pulse" style="animation-delay: 2s;"></div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center w-full z-10 relative">
+            
+            <div class="reveal">
+                <div class="inline-block border border-gray-800 bg-[rgba(255,255,255,0.03)] px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide text-neonBlue mb-6 backdrop-blur-md">
+                    <span class="w-2 h-2 rounded-full bg-neonBlue inline-block mr-2 animate-ping"></span> 
+                    ADVANCED ALGORITHMIC TRADING
+                </div>
+                <h1 class="text-5xl md:text-7xl font-display font-bold leading-tight mb-6">
+                    Trade Global Markets with <span class="text-glow-blue outfit">QuantEdge</span> Capital
+                </h1>
+                <p class="text-lg text-gray-400 mb-10 max-w-xl leading-relaxed">
+                    Experience professional-grade execution across Forex, Commodities, Stocks, Indices, and Cryptocurrency. Harness AI-powered tools, algorithmic trading, and unparalleled security to elevate your portfolio.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <a href="auth.html" class="bg-neonBlue text-darker text-center font-bold text-lg px-8 py-4 rounded-xl shadow-[0_0_20px_rgba(0,243,255,0.3)] hover:shadow-[0_0_30px_rgba(0,243,255,0.6)] hover:-translate-y-1 transition-all">Start Trading Now</a>
+                    <button onclick="document.getElementById('markets').scrollIntoView({behavior:'smooth'})" class="bg-transparent border border-gray-600 text-white font-bold text-lg px-8 py-4 rounded-xl hover:bg-gray-900 transition-all flex items-center justify-center gap-2">
+                        Explore Markets
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                </div>
+                
+                <div class="mt-12 flex items-center gap-8 text-sm text-gray-500">
+                    <div>
+                        <p class="font-display font-bold text-white text-2xl mb-1">2M+</p>
+                        <p>Active Users</p>
+                    </div>
+                    <div>
+                        <p class="font-display font-bold text-white text-2xl mb-1">$50B+</p>
+                        <p>Trading Volume</p>
+                    </div>
+                    <div>
+                        <p class="font-display font-bold text-neonGreen text-2xl mb-1 mt-1">0.0ms</p>
+                        <p>Order Execution</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative reveal h-full flex items-center justify-center lg:justify-end hidden md:flex">
+                <!-- Decorative Abstract Dashboard Illustration -->
+                <div class="w-full max-w-md h-[500px] glass-panel rounded-3xl p-6 relative z-10 glow-blue overflow-hidden hover:border-neonBlue transition-colors duration-500 group">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <p class="text-gray-400 text-xs">Primary Portfolio</p>
+                            <p class="text-3xl font-display font-bold text-white">$24,560.00</p>
+                        </div>
+                        <div class="bg-[rgba(0,255,102,0.1)] text-neonGreen px-3 py-1 rounded-full text-xs font-bold border border-green-900">+12.4%</div>
+                    </div>
+
+                    <div class="space-y-4 mb-8">
+                        <div class="bg-gray-800/50 p-4 rounded-xl flex justify-between items-center group-hover:bg-gray-800 transition-all">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-orange-500/20 text-orange-500 flex items-center justify-center font-bold">₿</div>
+                                <div><p class="text-sm font-bold">BTC/USD</p><p class="text-xs text-gray-400">Crypto</p></div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-mono">64,230.50</p>
+                                <p class="text-xs text-neonRed">-1.2%</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800/50 p-4 rounded-xl flex justify-between items-center group-hover:bg-gray-800 transition-all">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold">€</div>
+                                <div><p class="text-sm font-bold">EUR/USD</p><p class="text-xs text-gray-400">Forex</p></div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-mono">1.0845</p>
+                                <p class="text-xs text-neonGreen">+0.3%</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Abstract Chart Lines via SVG -->
+                    <div class="absolute bottom-0 left-0 w-full h-1/3 opacity-80">
+                        <svg viewBox="0 0 400 150" class="w-full h-full" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#00f3ff" stop-opacity="0.3"></stop>
+                                    <stop offset="100%" stop-color="#00f3ff" stop-opacity="0"></stop>
+                                </linearGradient>
+                            </defs>
+                            <path d="M0,150 L0,80 C100,20 150,120 250,60 C320,10 380,90 400,30 L400,150 Z" fill="url(#g)"></path>
+                            <path d="M0,80 C100,20 150,120 250,60 C320,10 380,90 400,30" fill="none" stroke="#00f3ff" stroke-width="3" class="animate-pulse"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Floating mini card -->
+                <div class="absolute -left-10 bottom-20 glass-panel p-4 rounded-2xl glow-green z-20 animate-[pulseGlow_4s_infinite]">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-neonGreen/20 flex items-center justify-center text-neonGreen">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400">Copy Trading</p>
+                            <p class="text-lg font-bold">Active</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Supported Markets Quick Banner -->
+    <div id="markets" class="border-y border-gray-800 bg-black/50 overflow-hidden relative reveal">
+        <div class="flex justify-center items-center py-8 gap-12 md:gap-24 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+            <span class="font-display font-bold text-xl tracking-wider">FOREX</span>
+            <span class="font-display font-bold text-xl tracking-wider">COMMODITIES</span>
+            <span class="font-display font-bold text-xl tracking-wider hidden md:block">STOCKS</span>
+            <span class="font-display font-bold text-xl tracking-wider hidden md:block">INDICES</span>
+            <span class="font-display font-bold text-xl tracking-wider hidden lg:block">CRYPTO</span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+</body>
+</html>

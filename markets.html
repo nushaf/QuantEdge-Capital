@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markets - QuantEdge Capital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/tailwind-config.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-dark text-white font-sans bg-mesh overflow-x-hidden min-h-screen flex flex-col">
+
+    <nav class="fixed w-full z-50 glass border-b border-gray-800" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-neonBlue shadow-[0_0_15px_rgba(0,243,255,0.5)] flex items-center justify-center text-darker font-bold pr-1 text-xl">Q</span>
+                <span class="font-display font-bold text-2xl tracking-tight">QuantEdge<span class="text-neonBlue">.</span></span>
+            </a>
+            
+            <div class="hidden md:flex items-center gap-8">
+                <a href="index.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Home</a>
+                <a href="about.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">About Us</a>
+                <a href="services.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Services</a>
+                <a href="markets.html" class="text-white font-medium hover:text-neonBlue transition-colors text-sm">Markets</a>
+                <a href="trust.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Trust & Security</a>
+                <a href="contact.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Contact</a>
+            </div>
+            
+            <div class="hidden md:flex items-center gap-4">
+                <a href="auth.html" class="bg-neonBlue text-darker font-bold text-sm px-6 py-2.5 rounded-full hover:shadow-[0_0_20px_rgba(0,243,255,0.4)] transition-all">Open Account</a>
+            </div>
+            
+            <button id="mobile-menu-btn" class="md:hidden text-white p-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-1 mt-20 pt-16 pb-24 max-w-7xl mx-auto px-6 w-full">
+        <div class="text-center mb-24 reveal">
+            <h1 class="text-4xl md:text-6xl font-display font-bold mb-6 text-glow-blue">Global Markets at Your Fingertips</h1>
+            <p class="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">
+                Unlock multi-asset liquidity with 0.0 spreads, leverage up to 1:500, and institutional execution on 250+ instruments.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            
+            <div class="glass-panel p-8 rounded-2xl reveal group">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-display font-bold">Forex</h2>
+                    <span class="w-10 h-10 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold text-xl">€</span>
+                </div>
+                <div class="space-y-4 mb-6">
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">EUR/USD</span><span class="text-neonGreen text-sm font-mono">+0.12%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">GBP/USD</span><span class="text-neonRed text-sm font-mono">-0.45%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">USD/JPY</span><span class="text-neonGreen text-sm font-mono">+1.05%</span></div>
+                </div>
+                <p class="text-xs text-gray-500 mb-6">Trade 60+ major, minor, and exotic currency pairs with raw spreads.</p>
+                <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Forex</a>
+            </div>
+
+            <div class="glass-panel p-8 rounded-2xl reveal group glow-gold">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-display font-bold">Cryptocurrency</h2>
+                    <span class="w-10 h-10 rounded-full bg-neonGold/20 text-neonGold flex items-center justify-center font-bold text-xl">₿</span>
+                </div>
+                <div class="space-y-4 mb-6">
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">BTC/USD</span><span class="text-neonRed text-sm font-mono">-2.10%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">ETH/USD</span><span class="text-neonGreen text-sm font-mono">+4.20%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">SOL/USD</span><span class="text-neonGreen text-sm font-mono">+8.75%</span></div>
+                </div>
+                <p class="text-xs text-gray-500 mb-6">Trade top digital assets 24/7 with deep liquidity and top security.</p>
+                <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Crypto</a>
+            </div>
+
+            <div class="glass-panel p-8 rounded-2xl reveal group">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-display font-bold">Commodities</h2>
+                    <span class="w-10 h-10 rounded-full bg-orange-500/20 text-orange-500 flex items-center justify-center font-bold text-xl">Au</span>
+                </div>
+                <div class="space-y-4 mb-6">
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">XAU/USD (Gold)</span><span class="text-neonGreen text-sm font-mono">+0.85%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">WTI Crude</span><span class="text-neonRed text-sm font-mono">-1.50%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">Brent Crude</span><span class="text-neonRed text-sm font-mono">-1.20%</span></div>
+                </div>
+                <p class="text-xs text-gray-500 mb-6">Hedge against inflation with Gold, Silver, Energy, and Agriculture.</p>
+                <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Commodities</a>
+            </div>
+
+            <div class="glass-panel p-8 rounded-2xl reveal group">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-display font-bold">Indices</h2>
+                    <span class="w-10 h-10 rounded-full bg-purple-500/20 text-purple-500 flex items-center justify-center font-bold text-xl">📊</span>
+                </div>
+                <div class="space-y-4 mb-6">
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">US30</span><span class="text-neonGreen text-sm font-mono">+1.25%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">NAS100</span><span class="text-neonGreen text-sm font-mono">+2.10%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">UK100</span><span class="text-neonRed text-sm font-mono">-0.10%</span></div>
+                </div>
+                <p class="text-xs text-gray-500 mb-6">Trade global economic performance with top global indices.</p>
+                <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Indices</a>
+            </div>
+
+            <div class="glass-panel p-8 rounded-2xl reveal group">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-display font-bold">Stocks Shares (CFDs)</h2>
+                    <span class="w-10 h-10 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center font-bold text-xl">📈</span>
+                </div>
+                <div class="space-y-4 mb-6">
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">AAPL</span><span class="text-neonGreen text-sm font-mono">+1.50%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">TSLA</span><span class="text-neonRed text-sm font-mono">-3.40%</span></div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">NVDA</span><span class="text-neonGreen text-sm font-mono">+4.20%</span></div>
+                </div>
+                <p class="text-xs text-gray-500 mb-6">Long or short global mega-caps with no commission directly from your portal.</p>
+                <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Stocks</a>
+            </div>
+
+            <!-- Promotion Banner -->
+            <div class="glass-panel p-8 rounded-2xl reveal bg-gradient-to-br from-[rgba(0,243,255,0.1)] to-[rgba(5,5,5,1)] flex flex-col justify-center border-neonBlue">
+                <h3 class="text-2xl font-display font-bold mb-4 text-glow-blue">Ready to conquer the market?</h3>
+                <p class="text-sm text-gray-400 mb-6 font-medium">Join 2 million traders leveraging QuantEdge Capital today. Enjoy 100% deposit bonus on first-time funding.</p>
+                <a href="auth.html" class="mt-auto bg-neonBlue text-darker font-bold py-3 rounded-lg text-center shadow-[0_0_15px_rgba(0,243,255,0.4)]">Open Live Account</a>
+            </div>
+            
+        </div>
+    </main>
+    <script src="js/main.js"></script>
+</body>
+</html>

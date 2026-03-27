@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services - QuantEdge Capital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/tailwind-config.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-dark text-white font-sans bg-mesh overflow-x-hidden min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="fixed w-full z-50 glass border-b border-gray-800" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-neonBlue shadow-[0_0_15px_rgba(0,243,255,0.5)] flex items-center justify-center text-darker font-bold pr-1 text-xl">Q</span>
+                <span class="font-display font-bold text-2xl tracking-tight">QuantEdge<span class="text-neonBlue">.</span></span>
+            </a>
+            
+            <div class="hidden md:flex items-center gap-8">
+                <a href="index.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Home</a>
+                <a href="about.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">About Us</a>
+                <a href="services.html" class="text-white font-medium hover:text-neonBlue transition-colors text-sm">Services</a>
+                <a href="markets.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Markets</a>
+                <a href="trust.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Trust & Security</a>
+                <a href="contact.html" class="text-gray-400 font-medium hover:text-white transition-colors text-sm">Contact</a>
+            </div>
+
+            <div class="hidden md:flex items-center gap-4">
+                <a href="auth.html" class="bg-neonBlue text-darker font-bold text-sm px-6 py-2.5 rounded-full hover:shadow-[0_0_20px_rgba(0,243,255,0.4)] transition-all">Open Account</a>
+            </div>
+
+            <button id="mobile-menu-btn" class="md:hidden text-white p-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <main class="flex-1 mt-20 pt-16 pb-24 max-w-7xl mx-auto px-6 w-full">
+        <div class="text-center mb-24 reveal">
+            <h1 class="text-4xl md:text-6xl font-display font-bold mb-6 text-glow-blue">Elite Trading Services</h1>
+            <p class="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">
+                Unlock the ultimate trading edge with our institutional-grade account management, algorithmic trading solutions, and verified signaling network.
+            </p>
+        </div>
+
+        <!-- Services Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+            
+            <!-- Service 1 -->
+            <div class="glass-panel p-10 rounded-3xl reveal border-t-4 border-neonBlue group hover:-translate-y-2 transition-transform duration-500">
+                <div class="w-16 h-16 rounded-xl bg-neonBlue/10 flex items-center justify-center text-neonBlue mb-8 shadow-[0_0_15px_rgba(0,243,255,0.2)]">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                </div>
+                <h2 class="text-2xl font-display font-bold mb-4">Account Management (MAM/PAMM)</h2>
+                <p class="text-gray-400 mb-6 leading-relaxed">Entrust your capital to professional fund managers with a proven track record. Our MAM/PAMM system automatically allocates trades proportionally, ensuring transparent risk management and steady growth without requiring you to manually execute a single order.</p>
+                <a href="auth.html" class="text-neonBlue font-bold hover:underline flex items-center gap-2">Get Managed <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+            </div>
+
+            <!-- Service 2 -->
+            <div class="glass-panel p-10 rounded-3xl reveal border-t-4 border-neonGreen group hover:-translate-y-2 transition-transform duration-500">
+                <div class="w-16 h-16 rounded-xl bg-neonGreen/10 flex items-center justify-center text-neonGreen mb-8 shadow-[0_0_15px_rgba(0,255,102,0.2)]">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                </div>
+                <h2 class="text-2xl font-display font-bold mb-4">Copy Trading</h2>
+                <p class="text-gray-400 mb-6 leading-relaxed">Discover top-performing traders on our comprehensive leaderboard and automatically mirror their strategies in real time. Adjust your risk tolerance, stop-out levels, and allocation effortlessly within your secure client portal.</p>
+                <a href="auth.html" class="text-neonGreen font-bold hover:underline flex items-center gap-2">Start Copying <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+            </div>
+
+            <!-- Service 3 -->
+            <div class="glass-panel p-10 rounded-3xl reveal border-t-4 border-neonGold group hover:-translate-y-2 transition-transform duration-500">
+                <div class="w-16 h-16 rounded-xl bg-neonGold/10 flex items-center justify-center text-neonGold mb-8 shadow-[0_0_15px_rgba(255,215,0,0.2)]">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                </div>
+                <h2 class="text-2xl font-display font-bold mb-4">Algorithmic Trading (Bots & EAs)</h2>
+                <p class="text-gray-400 mb-6 leading-relaxed">Deploy robust, back-tested algorithms that interact directly with our FIX API or MetaTrader backend. Our low-latency infrastructure, seated mere microseconds away from deep liquidity pools, guarantees optimal execution for your robotic systems.</p>
+                <a href="auth.html" class="text-neonGold font-bold hover:underline flex items-center gap-2">Deploy Bots <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+            </div>
+
+            <!-- Service 4 -->
+            <div class="glass-panel p-10 rounded-3xl reveal border-t-4 border-blue-500 group hover:-translate-y-2 transition-transform duration-500">
+                <div class="w-16 h-16 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 mb-8 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path></svg>
+                </div>
+                <h2 class="text-2xl font-display font-bold mb-4">Premium Signal Service</h2>
+                <p class="text-gray-400 mb-6 leading-relaxed">Receive real-time buy and sell signals generated by seasoned analysts and AI predictive models. Delivered directly via SMS, Telegram, and your QuantEdge dashboard, never miss an entry or exit point again.</p>
+                <a href="auth.html" class="text-blue-500 font-bold hover:underline flex items-center gap-2">Subscribe Now <svg class="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

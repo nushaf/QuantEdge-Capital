@@ -1,3 +1,15 @@
+import { auth, db, ADMIN_EMAIL } from './firebase-config.js';
+import {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    updateProfile
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+    doc,
+    setDoc,
+    serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 document.addEventListener('DOMContentLoaded', () => {
     const steps = document.querySelectorAll('.auth-step');
     const progressSteps = document.querySelectorAll('.progress-step');
@@ -7,9 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const showStep = (stepIndex) => {
         steps.forEach((step, index) => {
             step.classList.toggle('hidden', index !== stepIndex);
-            
-            // Add slight animation
-            if(index === stepIndex) {
+            if (index === stepIndex) {
                 step.classList.remove('opacity-0', 'translate-y-4');
                 step.classList.add('opacity-100', 'translate-y-0', 'transition-all', 'duration-500');
             } else {
@@ -22,33 +32,40 @@ document.addEventListener('DOMContentLoaded', () => {
             if (index <= stepIndex) {
                 step.classList.add('bg-neonBlue', 'border-neonBlue', 'shadow-[0_0_10px_#00f3ff]');
                 step.classList.remove('border-gray-600', 'bg-dark');
-                
-                // Update icon color to darker if background is neon
-                if(step.querySelector('svg')) {
+                if (step.querySelector('svg')) {
                     step.querySelector('svg').classList.remove('text-gray-400');
                     step.querySelector('svg').classList.add('text-darker');
                 }
             } else {
                 step.classList.remove('bg-neonBlue', 'border-neonBlue', 'shadow-[0_0_10px_#00f3ff]');
                 step.classList.add('border-gray-600', 'bg-dark');
-                if(step.querySelector('svg')) {
+                if (step.querySelector('svg')) {
                     step.querySelector('svg').classList.add('text-gray-400');
                     step.querySelector('svg').classList.remove('text-darker');
                 }
             }
         });
 
-        if(progressLine) {
+        if (progressLine) {
             progressLine.style.width = `${(stepIndex / (steps.length - 1)) * 100}%`;
         }
     };
 
     window.nextStep = () => {
-        // Here we could add validation
+        // Basic validation: require filled inputs on the current step before moving on
+        const currentStepEl = steps[currentStep];
+        const requiredInputs = currentStepEl.querySelectorAll('input[required]');
+        for (const input of requiredInputs) {
+            if (!input.value.trim()) {
+                showToast('Please fill in all fields', 'error');
+                input.focus();
+                return;
+            }
+        }
         if (currentStep < steps.length - 1) {
             currentStep++;
             showStep(currentStep);
-            window.scrollTo(0,0);
+            window.scrollTo(0, 0);
         }
     };
 
@@ -56,63 +73,95 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentStep > 0) {
             currentStep--;
             showStep(currentStep);
-            window.scrollTo(0,0);
+            window.scrollTo(0, 0);
         }
     };
 
-    window.submitForm = (e) => {
+    window.submitForm = async (e) => {
         e.preventDefault();
-        
-        // Change button state
+
         const btn = e.target.querySelector('button[type="submit"]');
         const originalText = btn.innerHTML;
         btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...`;
         btn.disabled = true;
 
-        setTimeout(() => {
+        const email = document.querySelector('#step-1 input[type="email"]').value.trim();
+        const password = document.querySelector('#step-1 input[type="password"]').value;
+        const fullName = document.querySelector('#step-2 input[type="text"]').value.trim();
+        const phone = document.querySelector('#step-2 input[type="tel"]').value.trim();
+
+        try {
+            const userCred = await createUserWithEmailAndPassword(auth, email, password);
+            await updateProfile(userCred.user, { displayName: fullName });
+            await setDoc(doc(db, 'users', userCred.user.uid), {
+                fullName,
+                email,
+                phone,
+                createdAt: serverTimestamp()
+            });
+
             showToast('Registration successful! Redirecting to dashboard...', 'success');
             setTimeout(() => {
-                window.location.href = 'dashboard.html';
+                window.location.href = (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ? 'admin.html' : 'dashboard.html';
             }, 1500);
-        }, 1500);
+        } catch (err) {
+            showToast(friendlyAuthError(err), 'error');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     };
 
-    window.login = (e) => {
+    window.login = async (e) => {
         e.preventDefault();
-        
+
         const btn = e.target.querySelector('button[type="submit"]');
         const originalText = btn.innerHTML;
         btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Authenticating...`;
         btn.disabled = true;
 
-        setTimeout(() => {
+        const email = e.target.querySelector('input[type="email"]').value.trim();
+        const password = e.target.querySelector('input[type="password"]').value;
+
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
             showToast('Login successful! Loading dashboard...', 'success');
             setTimeout(() => {
-                window.location.href = 'dashboard.html';
+                window.location.href = (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ? 'admin.html' : 'dashboard.html';
             }, 1000);
-        }, 1000);
+        } catch (err) {
+            showToast(friendlyAuthError(err), 'error');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     };
-    
+
     window.toggleMode = () => {
         const loginForm = document.getElementById('login-form');
         const registerForm = document.getElementById('register-form');
         const isLogin = !loginForm.classList.contains('hidden');
-        
+
         if (isLogin) {
             loginForm.classList.add('hidden');
             registerForm.classList.remove('hidden');
             document.getElementById('auth-title').innerText = 'Create Account';
-            document.getElementById('auth-subtitle').innerText = 'Join QuantEdge Capital today';
             showStep(0);
         } else {
             registerForm.classList.add('hidden');
             loginForm.classList.remove('hidden');
             document.getElementById('auth-title').innerText = 'Welcome Back';
-            document.getElementById('auth-subtitle').innerText = 'Log in to your account';
         }
     };
 
-    if(steps.length > 0) {
+    function friendlyAuthError(err) {
+        const code = err.code || '';
+        if (code.includes('email-already-in-use')) return 'That email is already registered — try logging in instead.';
+        if (code.includes('weak-password')) return 'Password should be at least 6 characters.';
+        if (code.includes('invalid-email')) return 'Please enter a valid email address.';
+        if (code.includes('user-not-found') || code.includes('wrong-password') || code.includes('invalid-credential')) return 'Incorrect email or password.';
+        return err.message || 'Something went wrong. Please try again.';
+    }
+
+    if (steps.length > 0) {
         steps.forEach(s => s.classList.add('opacity-0', 'translate-y-4'));
         showStep(currentStep);
     }

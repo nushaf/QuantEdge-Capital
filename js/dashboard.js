@@ -1,3 +1,6 @@
+import { auth, ADMIN_EMAIL } from './firebase-config.js';
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 // SPA Routing and Data
 const pages = {
     dashboard: { icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', title: 'Main Dashboard' },
@@ -17,6 +20,25 @@ const pages = {
 };
 
 let currentChart = null;
+
+// Guard this page: must be logged in, admin gets redirected to their own inbox
+onAuthStateChanged(auth, (user) => {
+    if (!user) {
+        window.location.href = 'auth.html';
+        return;
+    }
+    if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        window.location.href = 'admin.html';
+        return;
+    }
+
+    const name = user.displayName || user.email.split('@')[0];
+    const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    const nameEl = document.querySelector('#sidebar .sidebar-text p.font-bold');
+    const initialsEl = document.querySelector('#sidebar .w-10.h-10.rounded-full');
+    if (nameEl) nameEl.textContent = name;
+    if (initialsEl) initialsEl.textContent = initials;
+});
 
 // Initialize Dashboard
 document.addEventListener('DOMContentLoaded', () => {
@@ -63,10 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Load initial page
-    loadPage('dashboard');
+    window.loadPage('dashboard');
 });
 
-function loadPage(page, event = null) {
+window.loadPage = function loadPage(page, event = null) {
     if(event) event.preventDefault();
     
     // Update active nav
@@ -383,7 +405,9 @@ function initChart() {
 
 window.logout = function() {
     showToast('Logging out...', 'info');
-    setTimeout(() => {
-        window.location.href = 'index.html';
-    }, 1000);
+    signOut(auth).finally(() => {
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 800);
+    });
 };

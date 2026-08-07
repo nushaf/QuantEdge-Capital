@@ -161,14 +161,32 @@
         </div>
     </main>
 
-    <!-- Supported Markets Quick Banner -->
-    <div id="markets" class="border-y border-gray-800 bg-black/50 overflow-hidden relative reveal">
-        <div class="flex justify-center items-center py-8 gap-12 md:gap-24 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-            <span class="font-display font-bold text-xl tracking-wider">FOREX</span>
-            <span class="font-display font-bold text-xl tracking-wider">COMMODITIES</span>
-            <span class="font-display font-bold text-xl tracking-wider hidden md:block">STOCKS</span>
-            <span class="font-display font-bold text-xl tracking-wider hidden md:block">INDICES</span>
-            <span class="font-display font-bold text-xl tracking-wider hidden lg:block">CRYPTO</span>
+    <!-- Live Markets Ticker (real-time, powered by TradingView) -->
+    <div id="markets" class="border-y border-gray-800 bg-black/50 relative reveal py-4">
+        <div class="tradingview-widget-container">
+            <div class="tradingview-widget-container__widget"></div>
+            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+            {
+              "symbols": [
+                { "proName": "FX:EURUSD", "title": "EUR/USD" },
+                { "proName": "FX:GBPUSD", "title": "GBP/USD" },
+                { "proName": "FX:USDJPY", "title": "USD/JPY" },
+                { "proName": "TVC:GOLD", "title": "Gold" },
+                { "proName": "TVC:USOIL", "title": "WTI Crude" },
+                { "proName": "BINANCE:BTCUSDT", "title": "Bitcoin" },
+                { "proName": "BINANCE:ETHUSDT", "title": "Ethereum" },
+                { "proName": "TVC:DJI", "title": "US30" },
+                { "proName": "TVC:NDX", "title": "NAS100" },
+                { "proName": "NASDAQ:AAPL", "title": "Apple" }
+              ],
+              "colorTheme": "dark",
+              "locale": "en",
+              "largeChartUrl": "",
+              "isTransparent": true,
+              "showSymbolLogo": true,
+              "displayMode": "adaptive"
+            }
+            </script>
         </div>
     </div>
 

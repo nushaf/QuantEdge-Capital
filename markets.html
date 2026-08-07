@@ -44,6 +44,71 @@
             </p>
         </div>
 
+        <!-- Live Market Overview (real-time, powered by TradingView) -->
+        <div class="glass-panel p-4 md:p-6 rounded-2xl reveal mb-16">
+            <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+                {
+                  "colorTheme": "dark",
+                  "dateRange": "1D",
+                  "showChart": true,
+                  "locale": "en",
+                  "width": "100%",
+                  "height": "500",
+                  "largeChartUrl": "",
+                  "isTransparent": true,
+                  "showSymbolLogo": true,
+                  "showFloatingTooltip": false,
+                  "plotLineColorGrowing": "rgba(0, 243, 255, 1)",
+                  "plotLineColorFalling": "rgba(255, 61, 113, 1)",
+                  "gridLineColor": "rgba(240, 243, 250, 0)",
+                  "scaleFontColor": "rgba(120, 123, 134, 1)",
+                  "belowLineFillColorGrowing": "rgba(0, 243, 255, 0.12)",
+                  "belowLineFillColorFalling": "rgba(255, 61, 113, 0.12)",
+                  "belowLineFillColorGrowingBottom": "rgba(0, 243, 255, 0)",
+                  "belowLineFillColorFallingBottom": "rgba(255, 61, 113, 0)",
+                  "symbolActiveColor": "rgba(0, 243, 255, 0.12)",
+                  "tabs": [
+                    {
+                      "title": "Forex",
+                      "symbols": [
+                        { "s": "FX:EURUSD" }, { "s": "FX:GBPUSD" }, { "s": "FX:USDJPY" },
+                        { "s": "FX:AUDUSD" }, { "s": "FX:USDCAD" }
+                      ]
+                    },
+                    {
+                      "title": "Commodities",
+                      "symbols": [
+                        { "s": "TVC:GOLD" }, { "s": "TVC:SILVER" }, { "s": "TVC:USOIL" }, { "s": "TVC:UKOIL" }
+                      ]
+                    },
+                    {
+                      "title": "Crypto",
+                      "symbols": [
+                        { "s": "BINANCE:BTCUSDT" }, { "s": "BINANCE:ETHUSDT" },
+                        { "s": "BINANCE:SOLUSDT" }, { "s": "BINANCE:XRPUSDT" }
+                      ]
+                    },
+                    {
+                      "title": "Indices",
+                      "symbols": [
+                        { "s": "TVC:DJI" }, { "s": "TVC:NDX" }, { "s": "TVC:UKX" }, { "s": "TVC:DAX" }
+                      ]
+                    },
+                    {
+                      "title": "Stocks",
+                      "symbols": [
+                        { "s": "NASDAQ:AAPL" }, { "s": "NASDAQ:TSLA" },
+                        { "s": "NASDAQ:NVDA" }, { "s": "NASDAQ:MSFT" }
+                      ]
+                    }
+                  ]
+                }
+                </script>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             
             <div class="glass-panel p-8 rounded-2xl reveal group">
@@ -51,10 +116,13 @@
                     <h2 class="text-xl font-display font-bold">Forex</h2>
                     <span class="w-10 h-10 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold text-xl">€</span>
                 </div>
-                <div class="space-y-4 mb-6">
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">EUR/USD</span><span class="text-neonGreen text-sm font-mono">+0.12%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">GBP/USD</span><span class="text-neonRed text-sm font-mono">-0.45%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">USD/JPY</span><span class="text-neonGreen text-sm font-mono">+1.05%</span></div>
+                <div class="mb-6 rounded-lg overflow-hidden" style="height:150px;">
+                    <div class="tradingview-widget-container" style="height:100%;">
+                        <div class="tradingview-widget-container__widget"></div>
+                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+                        { "symbol": "FX:EURUSD", "width": "100%", "height": "150", "locale": "en", "dateRange": "1D", "colorTheme": "dark", "trendLineColor": "rgba(0, 243, 255, 1)", "underLineColor": "rgba(0, 243, 255, 0.15)", "underLineBottomColor": "rgba(0, 243, 255, 0)", "isTransparent": true, "autosize": true, "largeChartUrl": "" }
+                        </script>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-500 mb-6">Trade 60+ major, minor, and exotic currency pairs with raw spreads.</p>
                 <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Forex</a>
@@ -65,10 +133,13 @@
                     <h2 class="text-xl font-display font-bold">Cryptocurrency</h2>
                     <span class="w-10 h-10 rounded-full bg-neonGold/20 text-neonGold flex items-center justify-center font-bold text-xl">₿</span>
                 </div>
-                <div class="space-y-4 mb-6">
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">BTC/USD</span><span class="text-neonRed text-sm font-mono">-2.10%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">ETH/USD</span><span class="text-neonGreen text-sm font-mono">+4.20%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">SOL/USD</span><span class="text-neonGreen text-sm font-mono">+8.75%</span></div>
+                <div class="mb-6 rounded-lg overflow-hidden" style="height:150px;">
+                    <div class="tradingview-widget-container" style="height:100%;">
+                        <div class="tradingview-widget-container__widget"></div>
+                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+                        { "symbol": "BINANCE:BTCUSDT", "width": "100%", "height": "150", "locale": "en", "dateRange": "1D", "colorTheme": "dark", "trendLineColor": "rgba(247, 181, 0, 1)", "underLineColor": "rgba(247, 181, 0, 0.15)", "underLineBottomColor": "rgba(247, 181, 0, 0)", "isTransparent": true, "autosize": true, "largeChartUrl": "" }
+                        </script>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-500 mb-6">Trade top digital assets 24/7 with deep liquidity and top security.</p>
                 <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Crypto</a>
@@ -79,10 +150,13 @@
                     <h2 class="text-xl font-display font-bold">Commodities</h2>
                     <span class="w-10 h-10 rounded-full bg-orange-500/20 text-orange-500 flex items-center justify-center font-bold text-xl">Au</span>
                 </div>
-                <div class="space-y-4 mb-6">
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">XAU/USD (Gold)</span><span class="text-neonGreen text-sm font-mono">+0.85%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">WTI Crude</span><span class="text-neonRed text-sm font-mono">-1.50%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">Brent Crude</span><span class="text-neonRed text-sm font-mono">-1.20%</span></div>
+                <div class="mb-6 rounded-lg overflow-hidden" style="height:150px;">
+                    <div class="tradingview-widget-container" style="height:100%;">
+                        <div class="tradingview-widget-container__widget"></div>
+                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+                        { "symbol": "TVC:GOLD", "width": "100%", "height": "150", "locale": "en", "dateRange": "1D", "colorTheme": "dark", "trendLineColor": "rgba(255, 152, 0, 1)", "underLineColor": "rgba(255, 152, 0, 0.15)", "underLineBottomColor": "rgba(255, 152, 0, 0)", "isTransparent": true, "autosize": true, "largeChartUrl": "" }
+                        </script>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-500 mb-6">Hedge against inflation with Gold, Silver, Energy, and Agriculture.</p>
                 <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Commodities</a>
@@ -93,10 +167,13 @@
                     <h2 class="text-xl font-display font-bold">Indices</h2>
                     <span class="w-10 h-10 rounded-full bg-purple-500/20 text-purple-500 flex items-center justify-center font-bold text-xl">📊</span>
                 </div>
-                <div class="space-y-4 mb-6">
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">US30</span><span class="text-neonGreen text-sm font-mono">+1.25%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">NAS100</span><span class="text-neonGreen text-sm font-mono">+2.10%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">UK100</span><span class="text-neonRed text-sm font-mono">-0.10%</span></div>
+                <div class="mb-6 rounded-lg overflow-hidden" style="height:150px;">
+                    <div class="tradingview-widget-container" style="height:100%;">
+                        <div class="tradingview-widget-container__widget"></div>
+                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+                        { "symbol": "TVC:DJI", "width": "100%", "height": "150", "locale": "en", "dateRange": "1D", "colorTheme": "dark", "trendLineColor": "rgba(168, 85, 247, 1)", "underLineColor": "rgba(168, 85, 247, 0.15)", "underLineBottomColor": "rgba(168, 85, 247, 0)", "isTransparent": true, "autosize": true, "largeChartUrl": "" }
+                        </script>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-500 mb-6">Trade global economic performance with top global indices.</p>
                 <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Indices</a>
@@ -107,10 +184,13 @@
                     <h2 class="text-xl font-display font-bold">Stocks Shares (CFDs)</h2>
                     <span class="w-10 h-10 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center font-bold text-xl">📈</span>
                 </div>
-                <div class="space-y-4 mb-6">
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">AAPL</span><span class="text-neonGreen text-sm font-mono">+1.50%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">TSLA</span><span class="text-neonRed text-sm font-mono">-3.40%</span></div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2"><span class="text-gray-400 text-sm">NVDA</span><span class="text-neonGreen text-sm font-mono">+4.20%</span></div>
+                <div class="mb-6 rounded-lg overflow-hidden" style="height:150px;">
+                    <div class="tradingview-widget-container" style="height:100%;">
+                        <div class="tradingview-widget-container__widget"></div>
+                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+                        { "symbol": "NASDAQ:AAPL", "width": "100%", "height": "150", "locale": "en", "dateRange": "1D", "colorTheme": "dark", "trendLineColor": "rgba(255, 61, 113, 1)", "underLineColor": "rgba(255, 61, 113, 0.15)", "underLineBottomColor": "rgba(255, 61, 113, 0)", "isTransparent": true, "autosize": true, "largeChartUrl": "" }
+                        </script>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-500 mb-6">Long or short global mega-caps with no commission directly from your portal.</p>
                 <a href="auth.html" class="w-full block text-center bg-gray-800 hover:bg-neonBlue hover:text-darker transition-colors py-3 rounded-lg font-bold text-sm">Trade Stocks</a>

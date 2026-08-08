@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox - QuantEdge Capital Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/tailwind-config.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-dark text-white font-sans bg-mesh overflow-x-hidden min-h-screen flex flex-col">
+
+    <nav class="fixed w-full z-50 glass border-b border-gray-800" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-neonBlue shadow-[0_0_15px_rgba(0,243,255,0.5)] flex items-center justify-center text-darker font-bold pr-1 text-xl">Q</span>
+                <span class="font-display font-bold text-2xl tracking-tight">QuantEdge<span class="text-neonBlue">.</span> <span class="text-neonGreen text-sm align-top">Admin</span></span>
+            </a>
+            <button onclick="handleLogout()" class="text-gray-300 hover:text-neonRed font-medium text-sm px-4 py-2 transition-colors">Log Out</button>
+        </div>
+    </nav>
+
+    <!-- Access gate shown until we confirm this is the admin -->
+    <div id="access-check" class="flex-1 mt-20 flex items-center justify-center">
+        <p class="text-gray-400 animate-pulse">Checking access...</p>
+    </div>
+
+    <!-- Inbox (hidden until access confirmed) -->
+    <main id="inbox-main" class="hidden flex-1 mt-20 pt-16 pb-24 max-w-4xl mx-auto px-6 w-full">
+        <div class="mb-8 reveal flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h1 class="text-4xl md:text-5xl font-display font-bold mb-3 text-glow-blue">Main Desk</h1>
+                <p class="text-gray-400">Manage client accounts and messages.</p>
+            </div>
+            <div class="flex gap-2 bg-[rgba(255,255,255,0.03)] border border-gray-800 rounded-xl p-1 w-fit flex-wrap">
+                <button id="tab-inbox" onclick="switchTab('inbox')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all bg-neonBlue text-darker">Inbox</button>
+                <button id="tab-clients" onclick="switchTab('clients')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Clients</button>
+                <button id="tab-requests" onclick="switchTab('requests')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Requests</button>
+                <button id="tab-settings" onclick="switchTab('settings')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Payment Settings</button>
+            </div>
+        </div>
+
+        <div id="panel-inbox">
+            <div id="messages-list" class="space-y-6">
+                <!-- Messages injected here -->
+            </div>
+            <p id="empty-state" class="text-gray-500 text-center py-16 hidden">No messages yet. New client messages will show up here automatically.</p>
+        </div>
+
+        <div id="panel-clients" class="hidden">
+            <div id="clients-list" class="space-y-4">
+                <!-- Clients injected here -->
+            </div>
+            <p id="clients-empty-state" class="text-gray-500 text-center py-16 hidden">No registered clients yet.</p>
+        </div>
+
+        <div id="panel-requests" class="hidden">
+            <div id="requests-list" class="space-y-6">
+                <!-- Deposit/withdrawal requests injected here -->
+            </div>
+            <p id="requests-empty-state" class="text-gray-500 text-center py-16 hidden">No deposit or withdrawal requests yet.</p>
+        </div>
+
+        <div id="panel-settings" class="hidden">
+            <div class="glass-panel p-8 rounded-2xl max-w-lg">
+                <h3 class="font-display font-bold text-lg mb-1">Deposit Details</h3>
+                <p class="text-gray-500 text-sm mb-6">Shown to clients when they choose Deposit. Update anytime — it's live instantly.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Crypto Wallet Address</label>
+                        <input id="settings-wallet-address" type="text" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Network Label (e.g. "USDT (TRC20)")</label>
+                        <input id="settings-wallet-network" type="text" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                    </div>
+                    <hr class="border-gray-800 my-2">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Bank Name</label>
+                        <input id="settings-bank-name" type="text" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Bank Account Name</label>
+                        <input id="settings-bank-account-name" type="text" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Account Number / IBAN</label>
+                        <input id="settings-bank-account-number" type="text" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                    </div>
+                </div>
+                <button id="save-settings-btn" onclick="savePaymentSettings()" class="mt-6 w-full bg-neonBlue text-darker font-bold py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Save Payment Details</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Edit client modal -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-2xl w-full max-w-md">
+            <h3 class="font-display font-bold text-xl mb-6">Edit Client Account</h3>
+            <p id="edit-modal-name" class="text-neonBlue text-sm font-mono mb-6"></p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Total Balance ($)</label>
+                    <input id="edit-balance" type="number" step="0.01" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Total Profit ($)</label>
+                    <input id="edit-profit" type="number" step="0.01" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Credit Bonus ($)</label>
+                    <input id="edit-credit-bonus" type="number" step="0.01" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Total Deposit ($)</label>
+                    <input id="edit-total-deposit" type="number" step="0.01" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Total Withdrawal ($)</label>
+                    <input id="edit-total-withdrawal" type="number" step="0.01" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                </div>
+            </div>
+            <div class="flex gap-3 mt-8">
+                <button onclick="closeEditModal()" class="flex-1 border border-gray-600 text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-800 transition-all">Cancel</button>
+                <button id="save-client-btn" onclick="saveClientEdit()" class="flex-1 bg-neonBlue text-darker font-bold py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script type="module" src="js/admin.js"></script>
+</body>
+</html>

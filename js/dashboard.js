@@ -1,16 +1,38 @@
 import { auth, db, ADMIN_EMAIL } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+    doc,
+    onSnapshot,
+    collection,
+    query,
+    where,
+    addDoc,
+    serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Live account data for the logged-in client — starts empty until Firestore loads it
 let accountData = {
     balance: 0,
-    activePositions: 0,
-    todaysProfit: 0,
-    todaysProfitPercent: 0,
-    portfolioHistory: [],
-    recentActivity: []
+    totalProfit: 0,
+    creditBonus: 0,
+    totalDeposit: 0,
+    totalWithdrawal: 0,
+    portfolioHistory: []
 };
+
+// Live payment details set by the admin (shown to clients during deposit)
+let paymentSettings = {
+    walletAddress: '',
+    walletNetwork: '',
+    bankAccountName: '',
+    bankName: '',
+    bankAccountNumber: '',
+    bankIBAN: ''
+};
+
+// Live list of this client's deposit/withdrawal requests
+let clientTransactions = [];
+let currentUserId = null;
 
 // SPA Routing and Data
 const pages = {
@@ -50,23 +72,44 @@ onAuthStateChanged(auth, (user) => {
     if (nameEl) nameEl.textContent = name;
     if (initialsEl) initialsEl.textContent = initials;
 
+    currentUserId = user.uid;
+
+    const rerenderIfActive = (pageNames) => {
+        const activeNavEl = document.querySelector('.nav-item[data-page].bg-neonBlue');
+        if (activeNavEl && pageNames.includes(activeNavEl.dataset.page)) {
+            window.loadPage(activeNavEl.dataset.page);
+        }
+    };
+
     // Live-sync account data — updates instantly whenever admin edits this client's account
     onSnapshot(doc(db, 'users', user.uid), (snap) => {
         if (snap.exists()) {
             const d = snap.data();
             accountData = {
                 balance: d.balance ?? 0,
-                activePositions: d.activePositions ?? 0,
-                todaysProfit: d.todaysProfit ?? 0,
-                todaysProfitPercent: d.todaysProfitPercent ?? 0,
-                portfolioHistory: d.portfolioHistory ?? [],
-                recentActivity: d.recentActivity ?? []
+                totalProfit: d.totalProfit ?? 0,
+                creditBonus: d.creditBonus ?? 0,
+                totalDeposit: d.totalDeposit ?? 0,
+                totalWithdrawal: d.totalWithdrawal ?? 0,
+                portfolioHistory: d.portfolioHistory ?? []
             };
-            const activeNavEl = document.querySelector('.nav-item[data-page].bg-neonBlue');
-            if (activeNavEl) {
-                window.loadPage(activeNavEl.dataset.page);
-            }
+            rerenderIfActive(['dashboard', 'wallet']);
         }
+    });
+
+    // Live-sync payment details set by admin
+    onSnapshot(doc(db, 'settings', 'paymentDetails'), (snap) => {
+        if (snap.exists()) {
+            paymentSettings = { ...paymentSettings, ...snap.data() };
+        }
+    });
+
+    // Live-sync this client's own deposit/withdrawal requests
+    const txQuery = query(collection(db, 'transactions'), where('userId', '==', user.uid));
+    onSnapshot(txQuery, (snapshot) => {
+        clientTransactions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        clientTransactions.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+        rerenderIfActive(['wallet', 'transactions']);
     });
 });
 
@@ -145,6 +188,7 @@ window.loadPage = function loadPage(page, event = null) {
     setTimeout(() => {
         if(page === 'dashboard') content.innerHTML = renderDashboard();
         else if(page === 'wallet') content.innerHTML = renderWallet();
+        else if(page === 'transactions') content.innerHTML = renderTransactionsPage();
         else if(page === 'trading') content.innerHTML = renderTrading();
         else if(page === 'copy') content.innerHTML = renderCopy();
         else content.innerHTML = renderPlaceholder(page);
@@ -160,67 +204,95 @@ window.loadPage = function loadPage(page, event = null) {
 
 // Render Functions (Simulating HTML pages)
 function renderDashboard() {
-    const balanceDisplay = `$${accountData.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    const profitDisplay = `${accountData.todaysProfit >= 0 ? '+' : ''}$${accountData.todaysProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    const profitPercentDisplay = `${accountData.todaysProfitPercent >= 0 ? '+' : ''}${accountData.todaysProfitPercent}% today`;
-    const profitColor = accountData.todaysProfit >= 0 ? 'text-neonGreen' : 'text-neonRed';
-    const hasActivity = accountData.recentActivity && accountData.recentActivity.length > 0;
+    const money = (n) => `$${(n ?? 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    const profitColor = accountData.totalProfit >= 0 ? 'text-neonGreen' : 'text-neonRed';
 
     return `
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
         <div class="glass-panel p-6 rounded-2xl glow-blue">
             <h3 class="text-gray-400 text-sm font-medium mb-1">Total Balance</h3>
-            <p class="text-3xl font-display font-bold text-white">${balanceDisplay}</p>
-            <p class="text-gray-500 text-sm mt-2">${accountData.balance === 0 ? 'No funds yet' : 'Updated by QuantEdge'}</p>
+            <p class="text-2xl font-display font-bold text-white">${money(accountData.balance)}</p>
         </div>
         <div class="glass-panel p-6 rounded-2xl">
-            <h3 class="text-gray-400 text-sm font-medium mb-1">Active Positions</h3>
-            <p class="text-3xl font-display font-bold text-white">${accountData.activePositions}</p>
-            <p class="text-gray-500 text-sm mt-2">${accountData.activePositions === 0 ? 'No open positions' : 'Across your markets'}</p>
+            <h3 class="text-gray-400 text-sm font-medium mb-1">Total Profit</h3>
+            <p class="text-2xl font-display font-bold ${profitColor}">${money(accountData.totalProfit)}</p>
         </div>
         <div class="glass-panel p-6 rounded-2xl">
-            <h3 class="text-gray-400 text-sm font-medium mb-1">Today's Profit</h3>
-            <p class="text-3xl font-display font-bold text-white">${profitDisplay}</p>
-            <p class="${profitColor} text-sm mt-2">${profitPercentDisplay}</p>
+            <h3 class="text-gray-400 text-sm font-medium mb-1">Credit Bonus</h3>
+            <p class="text-2xl font-display font-bold text-neonGold">${money(accountData.creditBonus)}</p>
+        </div>
+        <div class="glass-panel p-6 rounded-2xl">
+            <h3 class="text-gray-400 text-sm font-medium mb-1">Total Deposit</h3>
+            <p class="text-2xl font-display font-bold text-white">${money(accountData.totalDeposit)}</p>
+        </div>
+        <div class="glass-panel p-6 rounded-2xl">
+            <h3 class="text-gray-400 text-sm font-medium mb-1">Total Withdrawal</h3>
+            <p class="text-2xl font-display font-bold text-white">${money(accountData.totalWithdrawal)}</p>
         </div>
     </div>
     
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 glass-panel p-6 rounded-2xl">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="font-display font-bold text-lg">Portfolio Performance</h3>
-                <select class="bg-gray-800 text-xs px-3 py-1 rounded-lg border-gray-700 font-medium pb-2 pt-2">
-                    <option>1W</option>
-                    <option>1M</option>
-                    <option selected>1Y</option>
-                </select>
-            </div>
-            <div class="h-64 md:h-80 w-full relative">
-                <canvas id="mainChart"></canvas>
-                ${accountData.portfolioHistory.length === 0 ? `
-                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <p class="text-gray-500 text-sm">No performance data yet</p>
-                </div>` : ''}
-            </div>
+    <div class="glass-panel p-6 rounded-2xl">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="font-display font-bold text-lg">Portfolio Performance</h3>
+            <select class="bg-gray-800 text-xs px-3 py-1 rounded-lg border-gray-700 font-medium pb-2 pt-2">
+                <option>1W</option>
+                <option>1M</option>
+                <option selected>1Y</option>
+            </select>
         </div>
-        
-        <div class="glass-panel p-6 rounded-2xl flex flex-col">
-            <h3 class="font-display font-bold text-lg mb-4">Recent Activity</h3>
-            <div class="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                ${hasActivity ? accountData.recentActivity.map(a => `
-                <div class="flex items-center justify-between border-b border-gray-800 pb-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-neonBlue">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <div>
-                            <p class="text-sm text-white font-medium">${a.label}</p>
-                            <p class="text-xs text-gray-400">${a.date || ''}</p>
-                        </div>
-                    </div>
-                    <span class="text-sm font-bold ${a.amount < 0 ? 'text-neonRed' : 'text-neonGreen'}">${a.amount < 0 ? '-' : '+'}$${Math.abs(a.amount).toLocaleString()}</span>
-                </div>`).join('') : `<p class="text-gray-500 text-sm text-center py-8">No activity yet</p>`}
-            </div>
+        <div class="h-64 md:h-80 w-full relative">
+            <canvas id="mainChart"></canvas>
+            ${accountData.portfolioHistory.length === 0 ? `
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <p class="text-gray-500 text-sm">No performance data yet</p>
+            </div>` : ''}
+        </div>
+    </div>
+    `;
+}
+
+function transactionRowsHtml() {
+    if (clientTransactions.length === 0) {
+        return `<tr><td colspan="4" class="p-8 text-center text-gray-500">No transactions yet</td></tr>`;
+    }
+    return clientTransactions.map(tx => {
+        const isDeposit = tx.type === 'deposit';
+        const typeLabel = isDeposit ? `Deposit (${tx.method === 'wallet' ? 'Crypto' : 'Bank'})` : `Withdrawal (${tx.method === 'wallet' ? 'Crypto' : 'Bank'})`;
+        let statusLabel, statusClass;
+        if (tx.status === 'pending') {
+            statusLabel = isDeposit ? 'Deposit Pending' : 'Withdrawal Pending';
+            statusClass = 'bg-yellow-900/50 text-neonGold';
+        } else if (tx.status === 'approved') {
+            statusLabel = isDeposit ? 'Deposit Approved' : 'Withdrawal Completed';
+            statusClass = 'bg-green-900/50 text-neonGreen';
+        } else {
+            statusLabel = 'Rejected';
+            statusClass = 'bg-red-900/50 text-neonRed';
+        }
+        const dateStr = tx.createdAt && tx.createdAt.toDate ? tx.createdAt.toDate().toLocaleDateString() : '';
+        return `
+        <tr>
+            <td class="p-4 font-medium">${typeLabel}</td>
+            <td class="p-4 ${isDeposit ? 'text-neonGreen' : 'text-white'}">${isDeposit ? '+' : '-'}$${(tx.amount ?? 0).toLocaleString()}</td>
+            <td class="p-4"><span class="${statusClass} px-2 py-1 rounded text-xs">${statusLabel}</span></td>
+            <td class="p-4 text-gray-400">${dateStr}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderTransactionsPage() {
+    return `
+    <div class="glass-panel p-6 rounded-2xl">
+        <h3 class="font-display font-bold text-lg mb-4">All Transactions</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-gray-800 text-gray-400">
+                    <tr><th class="p-4 rounded-tl-lg">Type</th><th class="p-4">Amount</th><th class="p-4">Status</th><th class="p-4 rounded-tr-lg">Date</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    ${transactionRowsHtml()}
+                </tbody>
+            </table>
         </div>
     </div>
     `;
@@ -235,11 +307,11 @@ function renderWallet() {
             <p class="text-5xl font-display font-bold text-white">${balanceDisplay}</p>
         </div>
         <div class="flex gap-4 mt-6 md:mt-0">
-            <button onclick="showToast('Contact us to arrange a deposit', 'info')" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl shadow-[0_0_15px_rgba(0,243,255,0.4)] hover:bg-opacity-80 transition-all flex items-center gap-2">
+            <button onclick="openDepositModal()" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl shadow-[0_0_15px_rgba(0,243,255,0.4)] hover:bg-opacity-80 transition-all flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                 Deposit
             </button>
-            <button onclick="showToast('Withdrawal requires 2FA', 'error')" class="bg-transparent border border-gray-600 hover:border-white text-white font-bold px-8 py-3 rounded-xl transition-all flex items-center gap-2">
+            <button onclick="openWithdrawModal()" class="bg-transparent border border-gray-600 hover:border-white text-white font-bold px-8 py-3 rounded-xl transition-all flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 Withdraw
             </button>
@@ -254,9 +326,7 @@ function renderWallet() {
                     <tr><th class="p-4 rounded-tl-lg">Type</th><th class="p-4">Amount</th><th class="p-4">Status</th><th class="p-4 rounded-tr-lg">Date</th></tr>
                 </thead>
                 <tbody class="divide-y divide-gray-800">
-                    ${accountData.recentActivity && accountData.recentActivity.length > 0 ? accountData.recentActivity.map(a => `
-                    <tr><td class="p-4 font-medium">${a.label}</td><td class="p-4 ${a.amount < 0 ? 'text-white' : 'text-neonGreen'}">${a.amount < 0 ? '-' : '+'}$${Math.abs(a.amount).toLocaleString()}</td><td class="p-4"><span class="bg-green-900/50 text-neonGreen px-2 py-1 rounded text-xs">Completed</span></td><td class="p-4 text-gray-400">${a.date || ''}</td></tr>
-                    `).join('') : `<tr><td colspan="4" class="p-8 text-center text-gray-500">No transactions yet</td></tr>`}
+                    ${transactionRowsHtml()}
                 </tbody>
             </table>
         </div>
@@ -454,4 +524,245 @@ window.logout = function() {
             window.location.href = 'index.html';
         }, 800);
     });
+};
+
+// ---------- Deposit flow ----------
+let depositState = { amount: 0, method: null };
+
+function showDepositStep(n) {
+    document.querySelectorAll('.deposit-step').forEach((el, i) => {
+        el.classList.toggle('hidden', i !== n - 1);
+    });
+}
+
+window.openDepositModal = () => {
+    depositState = { amount: 0, method: null };
+    document.getElementById('deposit-amount').value = '';
+    document.getElementById('deposit-proof-preview').classList.add('hidden');
+    document.getElementById('deposit-proof-input').value = '';
+    showDepositStep(1);
+    document.getElementById('deposit-modal').classList.remove('hidden');
+};
+
+window.closeDepositModal = () => {
+    document.getElementById('deposit-modal').classList.add('hidden');
+};
+
+window.depositNext = (fromStep) => {
+    if (fromStep === 1) {
+        const amount = parseFloat(document.getElementById('deposit-amount').value);
+        if (!amount || amount <= 0) {
+            showToast('Enter a valid amount', 'error');
+            return;
+        }
+        depositState.amount = amount;
+        showDepositStep(2);
+    } else if (fromStep === 3) {
+        showDepositStep(4);
+    }
+};
+
+window.depositBack = (fromStep) => {
+    showDepositStep(fromStep - 1);
+};
+
+window.chooseDepositMethod = (method) => {
+    depositState.method = method;
+    const box = document.getElementById('deposit-details-box');
+
+    if (method === 'wallet') {
+        box.innerHTML = `
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">${paymentSettings.walletNetwork || 'Crypto Wallet Address'}</label>
+                <div class="flex items-center gap-2 bg-[rgba(255,255,255,0.03)] border border-gray-700 rounded-xl px-4 py-3">
+                    <span id="copy-wallet-address" class="text-sm font-mono text-neonBlue break-all flex-1">${paymentSettings.walletAddress || 'Not set yet — contact support'}</span>
+                    <button onclick="copyToClipboard('copy-wallet-address')" class="text-gray-400 hover:text-neonBlue flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500">Send exactly $${depositState.amount.toLocaleString()} worth, then continue.</p>
+        `;
+    } else {
+        box.innerHTML = `
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Bank Name</label>
+                <div class="flex items-center gap-2 bg-[rgba(255,255,255,0.03)] border border-gray-700 rounded-xl px-4 py-3">
+                    <span id="copy-bank-name" class="text-sm font-mono text-neonBlue flex-1">${paymentSettings.bankName || 'Not set yet'}</span>
+                    <button onclick="copyToClipboard('copy-bank-name')" class="text-gray-400 hover:text-neonBlue flex-shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Account Name</label>
+                <div class="flex items-center gap-2 bg-[rgba(255,255,255,0.03)] border border-gray-700 rounded-xl px-4 py-3">
+                    <span id="copy-bank-account-name" class="text-sm font-mono text-neonBlue flex-1">${paymentSettings.bankAccountName || 'Not set yet'}</span>
+                    <button onclick="copyToClipboard('copy-bank-account-name')" class="text-gray-400 hover:text-neonBlue flex-shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Account Number / IBAN</label>
+                <div class="flex items-center gap-2 bg-[rgba(255,255,255,0.03)] border border-gray-700 rounded-xl px-4 py-3">
+                    <span id="copy-bank-account-num" class="text-sm font-mono text-neonBlue flex-1">${paymentSettings.bankAccountNumber || paymentSettings.bankIBAN || 'Not set yet'}</span>
+                    <button onclick="copyToClipboard('copy-bank-account-num')" class="text-gray-400 hover:text-neonBlue flex-shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500">Transfer $${depositState.amount.toLocaleString()}, then continue.</p>
+        `;
+    }
+    showDepositStep(3);
+};
+
+window.copyToClipboard = (elId) => {
+    const text = document.getElementById(elId).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard', 'success');
+    }).catch(() => {
+        showToast('Could not copy — please copy manually', 'error');
+    });
+};
+
+function compressImage(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const maxWidth = 800;
+                const scale = Math.min(1, maxWidth / img.width);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.6));
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+document.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 'deposit-proof-input' && e.target.files[0]) {
+        const preview = document.getElementById('deposit-proof-preview');
+        preview.src = URL.createObjectURL(e.target.files[0]);
+        preview.classList.remove('hidden');
+    }
+});
+
+window.submitDeposit = async () => {
+    const fileInput = document.getElementById('deposit-proof-input');
+    const file = fileInput.files[0];
+    if (!file) {
+        showToast('Please upload a screenshot of your payment', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('deposit-submit-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Submitting...';
+    btn.disabled = true;
+
+    try {
+        const proofImage = await compressImage(file);
+        await addDoc(collection(db, 'transactions'), {
+            userId: currentUserId,
+            type: 'deposit',
+            amount: depositState.amount,
+            method: depositState.method,
+            proofImage,
+            status: 'pending',
+            createdAt: serverTimestamp()
+        });
+        showToast('Deposit submitted — we\'ll verify and credit it shortly', 'success');
+        window.closeDepositModal();
+    } catch (err) {
+        showToast('Could not submit deposit. Please try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
+// ---------- Withdrawal flow ----------
+let withdrawState = { amount: 0, method: null };
+
+window.openWithdrawModal = () => {
+    withdrawState = { amount: 0, method: null };
+    document.getElementById('withdraw-amount').value = '';
+    document.getElementById('withdraw-wallet-address').value = '';
+    document.getElementById('withdraw-bank-name-holder').value = '';
+    document.getElementById('withdraw-bank-name').value = '';
+    document.getElementById('withdraw-bank-account').value = '';
+    document.querySelectorAll('.withdraw-step').forEach((el, i) => el.classList.toggle('hidden', i !== 0));
+    document.getElementById('withdraw-modal').classList.remove('hidden');
+};
+
+window.closeWithdrawModal = () => {
+    document.getElementById('withdraw-modal').classList.add('hidden');
+};
+
+window.chooseWithdrawMethod = (method) => {
+    const amount = parseFloat(document.getElementById('withdraw-amount').value);
+    if (!amount || amount <= 0) {
+        showToast('Enter a valid amount first', 'error');
+        return;
+    }
+    withdrawState.amount = amount;
+    withdrawState.method = method;
+
+    document.getElementById('withdraw-wallet-fields').classList.toggle('hidden', method !== 'wallet');
+    document.getElementById('withdraw-bank-fields').classList.toggle('hidden', method !== 'bank');
+
+    document.querySelectorAll('.withdraw-step').forEach((el, i) => el.classList.toggle('hidden', i !== 1));
+};
+
+window.withdrawBack = () => {
+    document.querySelectorAll('.withdraw-step').forEach((el, i) => el.classList.toggle('hidden', i !== 0));
+};
+
+window.submitWithdrawal = async () => {
+    let destination = {};
+    if (withdrawState.method === 'wallet') {
+        const address = document.getElementById('withdraw-wallet-address').value.trim();
+        if (!address) {
+            showToast('Enter your wallet address', 'error');
+            return;
+        }
+        destination = { walletAddress: address };
+    } else {
+        const holder = document.getElementById('withdraw-bank-name-holder').value.trim();
+        const bank = document.getElementById('withdraw-bank-name').value.trim();
+        const account = document.getElementById('withdraw-bank-account').value.trim();
+        if (!holder || !bank || !account) {
+            showToast('Fill in all bank details', 'error');
+            return;
+        }
+        destination = { accountHolder: holder, bankName: bank, accountNumber: account };
+    }
+
+    const btn = document.getElementById('withdraw-submit-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Submitting...';
+    btn.disabled = true;
+
+    try {
+        await addDoc(collection(db, 'transactions'), {
+            userId: currentUserId,
+            type: 'withdrawal',
+            amount: withdrawState.amount,
+            method: withdrawState.method,
+            destination,
+            status: 'pending',
+            createdAt: serverTimestamp()
+        });
+        showToast('Withdrawal request submitted', 'success');
+        window.closeWithdrawModal();
+    } catch (err) {
+        showToast('Could not submit withdrawal. Please try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 };

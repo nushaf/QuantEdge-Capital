@@ -1,8 +1,17 @@
 import { auth, db, ADMIN_EMAIL } from './firebase-config.js';
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+    onAuthStateChanged,
+    signOut,
+    updateProfile,
+    reauthenticateWithCredential,
+    EmailAuthProvider,
+    updatePassword,
+    sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
     doc,
     onSnapshot,
+    updateDoc,
     collection,
     query,
     where,
@@ -33,22 +42,32 @@ let paymentSettings = {
 // Live list of this client's deposit/withdrawal requests
 let clientTransactions = [];
 let currentUserId = null;
+let currentUserEmail = null;
+
+// Live profile data (personal info + KYC + profile picture)
+let profileData = {
+    firstName: '',
+    lastName: '',
+    dob: '',
+    phone: '',
+    country: '',
+    address: '',
+    profilePicture: '',
+    kycType: '',
+    kycImage: ''
+};
 
 // SPA Routing and Data
 const pages = {
     dashboard: { icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', title: 'Main Dashboard' },
     wallet: { icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z', title: 'Wallet' },
-    markets: { icon: 'M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z', title: 'Markets (Advanced)' },
     trading: { icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6', title: 'Trading' },
     copy: { icon: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z', title: 'Copy Trading' },
-    signals: { icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', title: 'Signals' },
-    accounts: { icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', title: 'Account Management' },
     algo: { icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', title: 'Algo Trading' },
+    marketupdates: { icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', title: 'Market Updates' },
+    transactions: { icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', title: 'Transaction History' },
     profile: { icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', title: 'Profile' },
     security: { icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', title: 'Security Settings' },
-    documents: { icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', title: 'Documents' },
-    transactions: { icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', title: 'Transaction History' },
-    notifications: { icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', title: 'Notifications' },
     support: { icon: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z', title: 'Support' }
 };
 
@@ -65,14 +84,29 @@ onAuthStateChanged(auth, (user) => {
         return;
     }
 
-    const name = user.displayName || user.email.split('@')[0];
-    const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     const nameEl = document.querySelector('#sidebar .sidebar-text p.font-bold');
     const initialsEl = document.querySelector('#sidebar .w-10.h-10.rounded-full');
-    if (nameEl) nameEl.textContent = name;
-    if (initialsEl) initialsEl.textContent = initials;
+    const defaultName = user.displayName || user.email.split('@')[0];
+    const defaultInitials = defaultName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    if (nameEl) nameEl.textContent = defaultName;
+    if (initialsEl) initialsEl.textContent = defaultInitials;
 
     currentUserId = user.uid;
+    currentUserEmail = user.email;
+
+    function updateSidebarProfile() {
+        const fullName = (profileData.firstName || profileData.lastName)
+            ? `${profileData.firstName} ${profileData.lastName}`.trim()
+            : defaultName;
+        if (nameEl) nameEl.textContent = fullName;
+        if (initialsEl) {
+            if (profileData.profilePicture) {
+                initialsEl.innerHTML = `<img src="${profileData.profilePicture}" class="w-full h-full object-cover rounded-full">`;
+            } else {
+                initialsEl.textContent = fullName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+            }
+        }
+    }
 
     const rerenderIfActive = (pageNames) => {
         const activeNavEl = document.querySelector('.nav-item[data-page].bg-neonBlue');
@@ -93,7 +127,19 @@ onAuthStateChanged(auth, (user) => {
                 totalWithdrawal: d.totalWithdrawal ?? 0,
                 portfolioHistory: d.portfolioHistory ?? []
             };
-            rerenderIfActive(['dashboard', 'wallet']);
+            profileData = {
+                firstName: d.firstName ?? '',
+                lastName: d.lastName ?? '',
+                dob: d.dob ?? '',
+                phone: d.profilePhone ?? '',
+                country: d.country ?? '',
+                address: d.address ?? '',
+                profilePicture: d.profilePicture ?? '',
+                kycType: d.kycType ?? '',
+                kycImage: d.kycImage ?? ''
+            };
+            updateSidebarProfile();
+            rerenderIfActive(['dashboard', 'wallet', 'profile']);
         }
     });
 
@@ -191,15 +237,38 @@ window.loadPage = function loadPage(page, event = null) {
         else if(page === 'transactions') content.innerHTML = renderTransactionsPage();
         else if(page === 'trading') content.innerHTML = renderTrading();
         else if(page === 'copy') content.innerHTML = renderCopy();
+        else if(page === 'algo') content.innerHTML = renderAlgo();
+        else if(page === 'marketupdates') content.innerHTML = renderMarketUpdates();
+        else if(page === 'profile') content.innerHTML = renderProfile();
+        else if(page === 'security') content.innerHTML = renderSecurity();
+        else if(page === 'support') content.innerHTML = renderSupport();
         else content.innerHTML = renderPlaceholder(page);
         
-        // Re-init charts if needed
-        if(page === 'dashboard' || page === 'trading') initChart();
+        // Re-init charts / live widgets if needed (script tags inside innerHTML never auto-execute)
+        if(page === 'dashboard') initChart();
+        if(page === 'trading') initTradingPage();
+        if(page === 'marketupdates') initMarketUpdatesWidget();
+        if(page === 'profile') initProfilePage();
+        if(page === 'security') initSecurityPage();
+        if(page === 'support') initSupportPage();
 
         // Fade in
         content.classList.remove('opacity-0');
         content.classList.add('transition-opacity', 'duration-300');
     }, 150);
+}
+
+// Injects a TradingView widget via real DOM script creation (innerHTML-inserted <script> tags never execute)
+function injectTVWidget(containerId, scriptSrc, config) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '<div class="tradingview-widget-container__widget"></div>';
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = scriptSrc;
+    script.async = true;
+    script.innerHTML = JSON.stringify(config);
+    container.appendChild(script);
 }
 
 // Render Functions (Simulating HTML pages)
@@ -334,110 +403,560 @@ function renderWallet() {
     `;
 }
 
+const TRADING_PAIRS = [
+    { symbol: 'FX:EURUSD', label: 'EUR/USD', category: 'Forex' },
+    { symbol: 'FX:GBPUSD', label: 'GBP/USD', category: 'Forex' },
+    { symbol: 'FX:USDJPY', label: 'USD/JPY', category: 'Forex' },
+    { symbol: 'FX:AUDUSD', label: 'AUD/USD', category: 'Forex' },
+    { symbol: 'FX:USDCAD', label: 'USD/CAD', category: 'Forex' },
+    { symbol: 'FX:USDCHF', label: 'USD/CHF', category: 'Forex' },
+    { symbol: 'FX:NZDUSD', label: 'NZD/USD', category: 'Forex' },
+    { symbol: 'BINANCE:BTCUSDT', label: 'BTC/USD', category: 'Crypto' },
+    { symbol: 'BINANCE:ETHUSDT', label: 'ETH/USD', category: 'Crypto' },
+    { symbol: 'BINANCE:SOLUSDT', label: 'SOL/USD', category: 'Crypto' },
+    { symbol: 'BINANCE:XRPUSDT', label: 'XRP/USD', category: 'Crypto' },
+    { symbol: 'BINANCE:BNBUSDT', label: 'BNB/USD', category: 'Crypto' },
+    { symbol: 'TVC:GOLD', label: 'Gold (XAU/USD)', category: 'Commodities' },
+    { symbol: 'TVC:SILVER', label: 'Silver (XAG/USD)', category: 'Commodities' },
+    { symbol: 'TVC:USOIL', label: 'WTI Crude Oil', category: 'Commodities' },
+    { symbol: 'TVC:UKOIL', label: 'Brent Crude Oil', category: 'Commodities' },
+    { symbol: 'TVC:DJI', label: 'US30', category: 'Indices' },
+    { symbol: 'TVC:NDX', label: 'NAS100', category: 'Indices' },
+    { symbol: 'TVC:UKX', label: 'UK100', category: 'Indices' },
+    { symbol: 'TVC:DAX', label: 'GER40', category: 'Indices' },
+    { symbol: 'NASDAQ:AAPL', label: 'Apple', category: 'Stocks' },
+    { symbol: 'NASDAQ:TSLA', label: 'Tesla', category: 'Stocks' },
+    { symbol: 'NASDAQ:NVDA', label: 'Nvidia', category: 'Stocks' },
+    { symbol: 'NASDAQ:MSFT', label: 'Microsoft', category: 'Stocks' },
+    { symbol: 'NASDAQ:AMZN', label: 'Amazon', category: 'Stocks' },
+    { symbol: 'NASDAQ:GOOGL', label: 'Google', category: 'Stocks' }
+];
+let activeTradingSymbol = TRADING_PAIRS[0];
+
 function renderTrading() {
     return `
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-140px)]">
-        <!-- Sidebar Markets -->
-        <div class="glass-panel rounded-2xl p-4 flex flex-col h-full bg-darkCard overflow-hidden">
-            <input type="text" placeholder="Search pairs..." class="w-full bg-gray-800 border-none px-4 py-2 rounded-lg text-sm mb-4">
-            <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                <div class="flex justify-between items-center p-3 cursor-pointer bg-gray-800 rounded-lg border border-neonBlue shadow-[0_0_10px_rgba(0,243,255,0.1)]">
-                    <div><p class="font-bold text-white text-sm">EUR/USD</p><p class="text-xs text-gray-400">Forex</p></div>
-                    <div class="text-right"><p class="text-sm font-mono text-neonGreen">1.0845</p><p class="text-xs text-neonGreen">+0.12%</p></div>
-                </div>
-                <div class="flex justify-between items-center p-3 cursor-pointer hover:bg-gray-800 rounded-lg border border-transparent transition-all">
-                    <div><p class="font-bold text-white text-sm">BTC/USD</p><p class="text-xs text-gray-400">Crypto</p></div>
-                    <div class="text-right"><p class="text-sm font-mono text-neonRed">64,230.00</p><p class="text-xs text-neonRed">-1.50%</p></div>
-                </div>
-                 <div class="flex justify-between items-center p-3 cursor-pointer hover:bg-gray-800 rounded-lg border border-transparent transition-all">
-                    <div><p class="font-bold text-white text-sm">GOLD</p><p class="text-xs text-gray-400">Commodity</p></div>
-                    <div class="text-right"><p class="text-sm font-mono text-neonGreen">2,340.50</p><p class="text-xs text-neonGreen">+0.80%</p></div>
-                </div>
+    <div class="mb-6 rounded-xl overflow-hidden border border-gray-800">
+        <div id="trading-ticker-container"></div>
+    </div>
+
+    <div class="glass-panel p-4 md:p-6 rounded-2xl mb-6">
+        <input id="pair-search" type="text" placeholder="Search pairs — EUR/USD, BTC, Gold, Apple..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none mb-4">
+        <div id="pair-list" class="flex flex-wrap gap-2 mb-4 max-h-28 overflow-y-auto custom-scrollbar"></div>
+        <div id="tv-chart-container" class="h-[450px] md:h-[550px] w-full rounded-xl overflow-hidden bg-black/30"></div>
+    </div>
+
+    <div class="glass-panel p-6 rounded-2xl">
+        <h3 class="font-display font-bold text-lg mb-6">Place Order — <span id="active-symbol-label" class="text-neonBlue"></span></h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div>
+                <label class="block text-xs text-gray-400 mb-2">Lot Size</label>
+                <input id="order-lot" type="number" step="0.01" min="0.01" value="0.01" class="w-full bg-gray-800 border-none rounded-lg py-3 px-3 focus:ring-1 ring-neonBlue text-sm font-mono">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-2">Stop Loss</label>
+                <input id="order-sl" type="number" step="0.0001" placeholder="Optional" class="w-full bg-gray-800 border-none rounded-lg py-3 px-3 focus:ring-1 ring-neonBlue text-sm font-mono">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-2">Take Profit</label>
+                <input id="order-tp" type="number" step="0.0001" placeholder="Optional" class="w-full bg-gray-800 border-none rounded-lg py-3 px-3 focus:ring-1 ring-neonBlue text-sm font-mono">
             </div>
         </div>
-        
-        <!-- Main Chart & Orders -->
-        <div class="lg:col-span-3 flex flex-col gap-6">
-            <!-- Chart Area -->
-            <div class="glass-panel p-4 rounded-2xl flex-1 relative flex flex-col">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-display font-bold text-xl flex items-center gap-2"><span class="text-neonBlue">EUR/USD</span> <span class="text-sm text-gray-400 font-normal">Live Chart</span></h3>
-                    <div class="flex gap-2">
-                        <button class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs font-bold transition-all">1H</button>
-                        <button class="bg-neonBlue text-darker px-3 py-1 rounded text-xs font-bold shadow-[0_0_8px_#00f3ff]">4H</button>
-                        <button class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs font-bold transition-all">1D</button>
-                    </div>
-                </div>
-                <div class="flex-1 w-full min-h-[300px]">
-                    <canvas id="mainChart"></canvas>
-                </div>
-            </div>
-            
-            <!-- Buy / Sell Panel -->
-            <div class="glass-panel p-6 rounded-2xl flex gap-6 mt-auto">
-                <div class="flex-1">
-                    <label class="block text-xs text-gray-400 mb-2">Lot Size</label>
-                    <div class="flex bg-gray-800 rounded-lg overflow-hidden">
-                        <button class="px-3 text-gray-400 hover:text-white hover:bg-gray-700">-</button>
-                        <input type="number" value="1.0" class="w-full bg-transparent border-none text-center font-mono py-2 focus:ring-0 text-white" />
-                        <button class="px-3 text-gray-400 hover:text-white hover:bg-gray-700">+</button>
-                    </div>
-                </div>
-                <div class="flex-1">
-                    <label class="block text-xs text-gray-400 mb-2">Stop Loss</label>
-                    <input type="text" placeholder="1.0800" class="w-full bg-gray-800 border-none rounded-lg py-2 px-3 focus:ring-1 ring-neonBlue text-sm font-mono">
-                </div>
-                <div class="flex-1">
-                    <label class="block text-xs text-gray-400 mb-2">Take Profit</label>
-                    <input type="text" placeholder="1.0900" class="w-full bg-gray-800 border-none rounded-lg py-2 px-3 focus:ring-1 ring-neonBlue text-sm font-mono">
-                </div>
-                <div class="flex-[2] flex gap-4 items-end">
-                    <button onclick="showToast('Sell Order Executed at 1.0845', 'info')" class="flex-1 bg-neonRed bg-opacity-20 hover:bg-neonRed hover:text-white text-neonRed border border-neonRed font-bold py-2 rounded-lg transition-all text-sm">SELL<br><span class="text-xs font-mono font-normal opacity-80">1.0845</span></button>
-                    <button onclick="showToast('Buy Order Executed at 1.0846', 'success')" class="flex-1 bg-neonGreen bg-opacity-20 hover:bg-neonGreen hover:text-darker text-neonGreen border border-neonGreen font-bold py-2 rounded-lg transition-all text-sm shadow-[0_0_15px_rgba(0,255,102,0.2)]">BUY<br><span class="text-xs font-mono font-normal opacity-80">1.0846</span></button>
-                </div>
-            </div>
+        <div class="grid grid-cols-2 gap-4">
+            <button onclick="placeOrder('sell')" class="bg-neonRed bg-opacity-10 hover:bg-neonRed hover:text-white text-neonRed border border-neonRed font-bold py-4 rounded-xl transition-all">SELL</button>
+            <button onclick="placeOrder('buy')" class="bg-neonGreen bg-opacity-10 hover:bg-neonGreen hover:text-darker text-neonGreen border border-neonGreen font-bold py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(0,255,102,0.15)]">BUY</button>
         </div>
     </div>
     `;
 }
 
+function initTradingPage() {
+    injectTVWidget('trading-ticker-container', 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js', {
+        symbols: TRADING_PAIRS.slice(0, 10).map(p => ({ proName: p.symbol, title: p.label })),
+        colorTheme: 'dark',
+        locale: 'en',
+        largeChartUrl: '',
+        isTransparent: true,
+        showSymbolLogo: true,
+        displayMode: 'adaptive'
+    });
+
+    renderPairList(TRADING_PAIRS);
+    selectTradingPair(activeTradingSymbol);
+
+    const searchInput = document.getElementById('pair-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            const term = searchInput.value.trim().toLowerCase();
+            const filtered = TRADING_PAIRS.filter(p => p.label.toLowerCase().includes(term) || p.symbol.toLowerCase().includes(term) || p.category.toLowerCase().includes(term));
+            renderPairList(filtered);
+        });
+    }
+}
+
+function renderPairList(pairs) {
+    const list = document.getElementById('pair-list');
+    if (!list) return;
+    list.innerHTML = pairs.map(p => `
+        <button onclick='selectTradingPairBySymbol("${p.symbol}")' class="pair-chip px-4 py-2 rounded-lg text-sm font-medium transition-all ${p.symbol === activeTradingSymbol.symbol ? 'bg-neonBlue text-darker' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}">
+            ${p.label} <span class="opacity-60 text-xs">${p.category}</span>
+        </button>
+    `).join('');
+}
+
+window.selectTradingPairBySymbol = (symbol) => {
+    const pair = TRADING_PAIRS.find(p => p.symbol === symbol);
+    if (pair) selectTradingPair(pair);
+};
+
+function selectTradingPair(pair) {
+    activeTradingSymbol = pair;
+    const label = document.getElementById('active-symbol-label');
+    if (label) label.textContent = pair.label;
+    renderPairList(TRADING_PAIRS);
+
+    injectTVWidget('tv-chart-container', 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js', {
+        autosize: true,
+        symbol: pair.symbol,
+        interval: '60',
+        timezone: 'Etc/UTC',
+        theme: 'dark',
+        style: '1',
+        locale: 'en',
+        enable_publishing: false,
+        backgroundColor: 'rgba(5,5,5,1)',
+        gridColor: 'rgba(255,255,255,0.06)',
+        hide_top_toolbar: false,
+        hide_legend: false,
+        save_image: false,
+        calendar: false,
+        support_host: 'https://www.tradingview.com'
+    });
+}
+
+window.placeOrder = (side) => {
+    document.getElementById('insufficient-modal-symbol').textContent = activeTradingSymbol.label;
+    document.getElementById('insufficient-modal').classList.remove('hidden');
+};
+
+const COPY_TRADERS = {
+    'Highest ROI': [
+        { name: 'Marcus Chen', img: 11, roi: 284, copiers: 1420, risk: 'High' },
+        { name: 'Sofia Alvarez', img: 25, roi: 231, copiers: 980, risk: 'Medium' },
+        { name: 'Daniel Whitfield', img: 14, roi: 198, copiers: 1150, risk: 'High' },
+        { name: 'Amara Okafor', img: 32, roi: 176, copiers: 760, risk: 'Medium' },
+        { name: 'Viktor Petrov', img: 18, roi: 165, copiers: 890, risk: 'High' },
+        { name: 'Hana Kobayashi', img: 44, roi: 152, copiers: 640, risk: 'Medium' }
+    ],
+    'Most Copiers': [
+        { name: 'James O\'Connell', img: 12, roi: 94, copiers: 5240, risk: 'Low' },
+        { name: 'Priya Sharma', img: 47, roi: 88, copiers: 4870, risk: 'Low' },
+        { name: 'Lucas Bergström', img: 15, roi: 102, copiers: 4310, risk: 'Medium' },
+        { name: 'Chloe Dubois', img: 29, roi: 76, copiers: 3990, risk: 'Low' },
+        { name: 'Ahmed Hassan', img: 22, roi: 118, copiers: 3650, risk: 'Medium' },
+        { name: 'Isabella Romano', img: 36, roi: 85, copiers: 3210, risk: 'Low' }
+    ],
+    'Lowest Risk': [
+        { name: 'Robert Kim', img: 13, roi: 42, copiers: 2100, risk: 'Very Low' },
+        { name: 'Grace Müller', img: 40, roi: 38, copiers: 1870, risk: 'Very Low' },
+        { name: 'Thomas Anderson', img: 16, roi: 51, copiers: 1640, risk: 'Low' },
+        { name: 'Yuki Tanaka', img: 48, roi: 45, copiers: 1520, risk: 'Very Low' },
+        { name: 'Emma Larsson', img: 33, roi: 47, copiers: 1390, risk: 'Low' },
+        { name: 'Noah Fitzgerald', img: 19, roi: 39, copiers: 1210, risk: 'Very Low' }
+    ]
+};
+
 function renderCopy() {
+    const riskColor = (r) => r === 'High' ? 'text-neonRed' : r === 'Medium' ? 'text-neonGold' : 'text-neonGreen';
+
+    return Object.entries(COPY_TRADERS).map(([category, traders]) => `
+        <div class="mb-10">
+            <h3 class="font-display font-bold text-xl mb-6">${category} Traders</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                ${traders.map(t => `
+                <div class="glass-panel p-6 rounded-2xl hover:-translate-y-2 transition-transform duration-300">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex items-center gap-3">
+                            <img src="https://i.pravatar.cc/100?img=${t.img}" class="w-12 h-12 rounded-full border-2 border-neonBlue" alt="${t.name}">
+                            <div>
+                                <p class="font-bold text-white">${t.name}</p>
+                                <p class="text-xs text-gray-400">Risk: <span class="${riskColor(t.risk)}">${t.risk}</span></p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-neonGreen font-bold text-lg">+${t.roi}%</p>
+                            <p class="text-xs text-gray-400">ROI (YTD)</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm font-medium text-gray-400"><span class="text-white">${t.copiers.toLocaleString()}</span> Copiers</p>
+                        <button onclick="showToast('Started copying ${t.name.replace(/'/g, "\\'")}', 'success')" class="bg-neonBlue text-darker text-sm font-bold px-6 py-2 rounded-lg hover:shadow-[0_0_15px_#00f3ff] transition-all">Copy</button>
+                    </div>
+                </div>`).join('')}
+            </div>
+        </div>
+    `).join('');
+}
+
+const ALGO_SOFTWARE = [
+    { name: 'QuantEdge AlphaBot', winRate: 87, desc: 'Trend-following engine tuned for major forex pairs.' },
+    { name: 'NeuroTrade AI', winRate: 82, desc: 'Neural-network signal generator for crypto markets.' },
+    { name: 'PulseFX Engine', winRate: 79, desc: 'High-frequency scalper for volatile FX sessions.' },
+    { name: 'Momentum Reactor', winRate: 91, desc: 'Breakout detection across indices and commodities.' },
+    { name: 'GoldenRatio Bot', winRate: 84, desc: 'Fibonacci-based swing trading for gold and metals.' },
+    { name: 'ApexQuant Grid', winRate: 76, desc: 'Grid trading system for ranging markets.' },
+    { name: 'SentinelAI Guard', winRate: 88, desc: 'Risk-managed automated trend trader.' },
+    { name: 'VortexFX Scalper', winRate: 73, desc: 'Ultra-fast scalping on major currency pairs.' },
+    { name: 'EchoWave Signals', winRate: 80, desc: 'Wave-pattern recognition for index trading.' },
+    { name: 'TitanCore Executor', winRate: 90, desc: 'Multi-asset execution engine with adaptive risk.' }
+];
+
+function renderAlgo() {
     return `
-    <div class="flex justify-between items-center mb-6">
-        <h3 class="font-display font-bold text-xl">Top Performing Traders</h3>
-        <select class="bg-gray-800 text-sm px-4 py-2 rounded-lg border-gray-700 font-medium">
-            <option>Highest ROI</option>
-            <option>Most Copiers</option>
-            <option>Lowest Risk</option>
-        </select>
+    <div class="mb-6">
+        <h3 class="font-display font-bold text-xl mb-1">Algo Trading Software</h3>
+        <p class="text-gray-400 text-sm">Automated strategies you can activate on your funded account.</p>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        ${[1,2,3,4,5,6].map(i => `
+        ${ALGO_SOFTWARE.map(a => `
         <div class="glass-panel p-6 rounded-2xl hover:-translate-y-2 transition-transform duration-300">
-            <div class="flex justify-between items-start mb-4">
-                <div class="flex items-center gap-3">
-                    <img src="https://i.pravatar.cc/100?img=${i+10}" class="w-12 h-12 rounded-full border-2 border-neonBlue" alt="Trader">
-                    <div>
-                        <p class="font-bold text-white">Trader Alpha ${i}</p>
-                        <p class="text-xs text-gray-400">Risk Score: <span class="text-neonGold">Medium</span></p>
-                    </div>
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-12 h-12 rounded-xl bg-neonBlue/10 flex items-center justify-center text-neonBlue">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                 </div>
-                <div class="text-right">
-                    <p class="text-neonGreen font-bold text-lg">+${120 + i*15}%</p>
-                    <p class="text-xs text-gray-400">ROI (YTD)</p>
-                </div>
+                <span class="text-neonGreen font-bold text-lg">${a.winRate}%</span>
             </div>
-            <div class="h-16 mb-6">
-                <!-- Mini canvas representation could go here -->
-                <div class="w-full h-full bg-gray-800 rounded flex items-center justify-center opacity-50 text-xs">Chart Data</div>
-            </div>
-            <div class="flex justify-between items-center">
-                <p class="text-sm font-medium text-gray-400"><span class="text-white">${300 + i*50}</span> Copiers</p>
-                <button onclick="showToast('Started copying Trader Alpha ${i}', 'success')" class="bg-neonBlue text-darker text-sm font-bold px-6 py-2 rounded-lg hover:shadow-[0_0_15px_#00f3ff] transition-all">Copy</button>
-            </div>
+            <h4 class="font-bold text-white mb-1">${a.name}</h4>
+            <p class="text-gray-400 text-xs mb-4">${a.desc}</p>
+            <p class="text-xs text-gray-500 mb-4">Win Ratio</p>
+            <button onclick="showToast('Activation requires a funded account', 'info')" class="w-full bg-neonBlue text-darker text-sm font-bold py-2.5 rounded-lg hover:shadow-[0_0_15px_#00f3ff] transition-all">Activate</button>
         </div>`).join('')}
     </div>
     `;
+}
+
+function renderMarketUpdates() {
+    return `
+    <div class="mb-6">
+        <h3 class="font-display font-bold text-xl mb-1">Market Updates</h3>
+        <p class="text-gray-400 text-sm">Live daily economic calendar — high, medium and low impact news.</p>
+    </div>
+    <div class="glass-panel p-4 md:p-6 rounded-2xl">
+        <div id="market-updates-widget" class="h-[600px] w-full"></div>
+    </div>
+    `;
+}
+
+function initMarketUpdatesWidget() {
+    injectTVWidget('market-updates-widget', 'https://s3.tradingview.com/external-embedding/embed-widget-events.js', {
+        colorTheme: 'dark',
+        isTransparent: true,
+        width: '100%',
+        height: '100%',
+        locale: 'en',
+        importanceFilter: '-1,0,1',
+        countryFilter: 'us,gb,eu,jp,au,ca,nz,ch,cn'
+    });
+}
+
+function renderProfile() {
+    const initials = ((profileData.firstName?.[0] || '') + (profileData.lastName?.[0] || '')).toUpperCase() || (currentUserEmail?.[0] || 'U').toUpperCase();
+    return `
+    <div class="glass-panel p-8 rounded-2xl mb-8 flex flex-col items-center">
+        <div class="relative mb-4">
+            <div class="w-28 h-28 rounded-full bg-gray-800 border-2 border-neonBlue overflow-hidden flex items-center justify-center text-3xl font-bold text-neonBlue">
+                ${profileData.profilePicture ? `<img id="profile-pic-preview" src="${profileData.profilePicture}" class="w-full h-full object-cover">` : `<span id="profile-pic-preview-initials">${initials}</span>`}
+            </div>
+            <button onclick="document.getElementById('profile-pic-input').click()" class="absolute bottom-0 right-0 w-9 h-9 bg-neonBlue rounded-full flex items-center justify-center text-darker hover:bg-opacity-80 transition-all shadow-[0_0_10px_rgba(0,243,255,0.5)]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            </button>
+            <input id="profile-pic-input" type="file" accept="image/*" class="hidden">
+        </div>
+        <p class="text-gray-400 text-sm">Tap the pencil to update your profile picture</p>
+    </div>
+
+    <div class="glass-panel p-8 rounded-2xl mb-8">
+        <h3 class="font-display font-bold text-lg mb-6">Personal Information</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">First Name</label>
+                <input id="pf-first-name" type="text" value="${escapeAttr(profileData.firstName)}" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Last Name</label>
+                <input id="pf-last-name" type="text" value="${escapeAttr(profileData.lastName)}" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Date of Birth</label>
+                <input id="pf-dob" type="date" value="${escapeAttr(profileData.dob)}" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Phone Number</label>
+                <input id="pf-phone" type="tel" value="${escapeAttr(profileData.phone)}" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Country</label>
+                <input id="pf-country" type="text" value="${escapeAttr(profileData.country)}" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Address</label>
+                <input id="pf-address" type="text" value="${escapeAttr(profileData.address)}" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+            </div>
+        </div>
+        <button id="save-profile-btn" onclick="saveProfileInfo()" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Save Changes</button>
+    </div>
+
+    <div class="glass-panel p-8 rounded-2xl">
+        <h3 class="font-display font-bold text-lg mb-2">KYC Verification</h3>
+        <p class="text-gray-400 text-sm mb-6">Upload a valid ID document to verify your account.</p>
+        <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2">Document Type</label>
+            <select id="kyc-type" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                <option value="NIC" ${profileData.kycType === 'NIC' ? 'selected' : ''}>National ID Card (NIC)</option>
+                <option value="Driving License" ${profileData.kycType === 'Driving License' ? 'selected' : ''}>Driving License</option>
+            </select>
+        </div>
+        <input id="kyc-file-input" type="file" accept="image/*" class="w-full text-sm text-gray-400 mb-4 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-neonBlue file:text-darker file:font-bold hover:file:bg-opacity-80 file:cursor-pointer cursor-pointer">
+        ${profileData.kycImage ? `<img src="${profileData.kycImage}" class="max-w-xs rounded-xl border border-gray-700 mb-4">` : ''}
+        <button id="save-kyc-btn" onclick="uploadKycDocument()" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Upload Document</button>
+    </div>
+    `;
+}
+
+function escapeAttr(str) {
+    return (str || '').replace(/"/g, '&quot;');
+}
+
+function initProfilePage() {
+    const picInput = document.getElementById('profile-pic-input');
+    if (picInput) {
+        picInput.addEventListener('change', async () => {
+            if (!picInput.files[0]) return;
+            try {
+                const compressed = await compressImage(picInput.files[0]);
+                await updateDoc(doc(db, 'users', currentUserId), { profilePicture: compressed });
+                showToast('Profile picture updated', 'success');
+            } catch (err) {
+                showToast('Could not update picture. Please try again.', 'error');
+            }
+        });
+    }
+}
+
+window.saveProfileInfo = async () => {
+    const btn = document.getElementById('save-profile-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Saving...';
+    btn.disabled = true;
+
+    try {
+        const firstName = document.getElementById('pf-first-name').value.trim();
+        const lastName = document.getElementById('pf-last-name').value.trim();
+        await updateDoc(doc(db, 'users', currentUserId), {
+            firstName,
+            lastName,
+            dob: document.getElementById('pf-dob').value,
+            profilePhone: document.getElementById('pf-phone').value.trim(),
+            country: document.getElementById('pf-country').value.trim(),
+            address: document.getElementById('pf-address').value.trim()
+        });
+        if (auth.currentUser && (firstName || lastName)) {
+            updateProfile(auth.currentUser, { displayName: `${firstName} ${lastName}`.trim() }).catch(() => {});
+        }
+        showToast('Profile updated', 'success');
+    } catch (err) {
+        showToast('Could not save. Please try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
+window.uploadKycDocument = async () => {
+    const fileInput = document.getElementById('kyc-file-input');
+    const file = fileInput.files[0];
+    if (!file) {
+        showToast('Choose a document file first', 'error');
+        return;
+    }
+    const btn = document.getElementById('save-kyc-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Uploading...';
+    btn.disabled = true;
+
+    try {
+        const compressed = await compressImage(file);
+        await updateDoc(doc(db, 'users', currentUserId), {
+            kycType: document.getElementById('kyc-type').value,
+            kycImage: compressed,
+            kycStatus: 'pending'
+        });
+        showToast('Document uploaded for review', 'success');
+    } catch (err) {
+        showToast('Could not upload. Please try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
+function renderSecurity() {
+    return `
+    <div class="glass-panel p-8 rounded-2xl max-w-lg">
+        <h3 class="font-display font-bold text-lg mb-6">Change Password</h3>
+        <div class="space-y-4 mb-2">
+            <div class="relative">
+                <label class="block text-sm text-gray-400 mb-2">Current Password</label>
+                <input id="sec-current-password" type="password" class="w-full px-4 py-3 pr-12 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                <button type="button" onclick="togglePasswordVisibility('sec-current-password', this)" class="absolute right-3 top-[42px] text-gray-400 hover:text-white">${eyeIconOpen()}</button>
+            </div>
+            <div class="relative">
+                <label class="block text-sm text-gray-400 mb-2">New Password</label>
+                <input id="sec-new-password" type="password" class="w-full px-4 py-3 pr-12 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                <button type="button" onclick="togglePasswordVisibility('sec-new-password', this)" class="absolute right-3 top-[42px] text-gray-400 hover:text-white">${eyeIconOpen()}</button>
+            </div>
+            <div class="relative">
+                <label class="block text-sm text-gray-400 mb-2">Re-enter New Password</label>
+                <input id="sec-confirm-password" type="password" class="w-full px-4 py-3 pr-12 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                <button type="button" onclick="togglePasswordVisibility('sec-confirm-password', this)" class="absolute right-3 top-[42px] text-gray-400 hover:text-white">${eyeIconOpen()}</button>
+            </div>
+        </div>
+        <p id="sec-forgot-link" class="hidden text-sm text-neonBlue hover:underline cursor-pointer mb-4" onclick="sendSecurityPasswordReset()">Forgot your current password? Reset it via email</p>
+        <button id="save-password-btn" onclick="changeUserPassword()" class="w-full bg-neonBlue text-darker font-bold py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Update Password</button>
+    </div>
+    `;
+}
+
+function eyeIconOpen() {
+    return `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
+}
+function eyeIconClosed() {
+    return `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path></svg>`;
+}
+
+window.togglePasswordVisibility = (inputId, btn) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    btn.innerHTML = isHidden ? eyeIconClosed() : eyeIconOpen();
+};
+
+function initSecurityPage() {
+    // no-op currently, hook exists for future setup
+}
+
+window.changeUserPassword = async () => {
+    const current = document.getElementById('sec-current-password').value;
+    const newPass = document.getElementById('sec-new-password').value;
+    const confirm = document.getElementById('sec-confirm-password').value;
+    const forgotLink = document.getElementById('sec-forgot-link');
+
+    if (!current || !newPass || !confirm) {
+        showToast('Fill in all password fields', 'error');
+        return;
+    }
+    if (newPass !== confirm) {
+        showToast('New passwords do not match', 'error');
+        return;
+    }
+    if (newPass.length < 6) {
+        showToast('New password should be at least 6 characters', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('save-password-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Updating...';
+    btn.disabled = true;
+
+    try {
+        const credential = EmailAuthProvider.credential(auth.currentUser.email, current);
+        await reauthenticateWithCredential(auth.currentUser, credential);
+        await updatePassword(auth.currentUser, newPass);
+        showToast('Password updated successfully', 'success');
+        document.getElementById('sec-current-password').value = '';
+        document.getElementById('sec-new-password').value = '';
+        document.getElementById('sec-confirm-password').value = '';
+        forgotLink.classList.add('hidden');
+    } catch (err) {
+        if (err.code && err.code.includes('wrong-password')) {
+            showToast('Current password is incorrect', 'error');
+            forgotLink.classList.remove('hidden');
+        } else if (err.code && err.code.includes('invalid-credential')) {
+            showToast('Current password is incorrect', 'error');
+            forgotLink.classList.remove('hidden');
+        } else {
+            showToast('Could not update password. Please try again.', 'error');
+        }
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
+window.sendSecurityPasswordReset = () => {
+    sendPasswordResetEmail(auth, currentUserEmail).then(() => {
+        showToast('Password reset email sent — check your inbox', 'success');
+    }).catch(() => {
+        showToast('Could not send reset email. Please try again.', 'error');
+    });
+};
+
+function renderSupport() {
+    return `
+    <div class="glass-panel p-8 rounded-2xl max-w-2xl">
+        <h3 class="font-display font-bold text-xl mb-2">Get in Touch</h3>
+        <p class="text-gray-400 text-sm mb-6">Send us a message and our team will respond as soon as possible.</p>
+        <form id="support-form" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">First Name</label>
+                    <input id="sup-first-name" type="text" required class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Last Name</label>
+                    <input id="sup-last-name" type="text" required class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Message</label>
+                <textarea id="sup-message" required rows="4" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none resize-none"></textarea>
+            </div>
+            <button type="submit" class="w-full md:w-auto bg-neonBlue text-darker font-bold px-8 py-4 rounded-xl shadow-[0_0_15px_rgba(0,243,255,0.4)] hover:shadow-[0_0_25px_rgba(0,243,255,0.5)] transition-all">Send Message</button>
+        </form>
+    </div>
+    `;
+}
+
+function initSupportPage() {
+    const form = document.getElementById('support-form');
+    if (!form) return;
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button[type="submit"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = 'Sending...';
+        btn.disabled = true;
+
+        try {
+            await addDoc(collection(db, 'messages'), {
+                name: `${document.getElementById('sup-first-name').value.trim()} ${document.getElementById('sup-last-name').value.trim()}`.trim(),
+                email: currentUserEmail,
+                message: document.getElementById('sup-message').value.trim(),
+                userId: currentUserId,
+                status: 'unread',
+                reply: null,
+                createdAt: serverTimestamp()
+            });
+            showToast('Message sent successfully!', 'success');
+            form.reset();
+        } catch (err) {
+            showToast('Could not send message. Please try again.', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
 }
 
 function renderPlaceholder(page) {
@@ -668,6 +1187,8 @@ window.submitDeposit = async () => {
         const proofImage = await compressImage(file);
         await addDoc(collection(db, 'transactions'), {
             userId: currentUserId,
+            userEmail: currentUserEmail,
+            userName: (profileData.firstName || profileData.lastName) ? `${profileData.firstName} ${profileData.lastName}`.trim() : (auth.currentUser?.displayName || currentUserEmail),
             type: 'deposit',
             amount: depositState.amount,
             method: depositState.method,
@@ -750,6 +1271,8 @@ window.submitWithdrawal = async () => {
     try {
         await addDoc(collection(db, 'transactions'), {
             userId: currentUserId,
+            userEmail: currentUserEmail,
+            userName: (profileData.firstName || profileData.lastName) ? `${profileData.firstName} ${profileData.lastName}`.trim() : (auth.currentUser?.displayName || currentUserEmail),
             type: 'withdrawal',
             amount: withdrawState.amount,
             method: withdrawState.method,

@@ -2,7 +2,8 @@ import { auth, db, ADMIN_EMAIL } from './firebase-config.js';
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
-    updateProfile
+    updateProfile,
+    sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
     doc,
@@ -86,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.disabled = true;
 
         const email = document.querySelector('#step-1 input[type="email"]').value.trim();
-        const password = document.querySelector('#step-1 input[type="password"]').value;
+        const password = document.getElementById('register-password').value;
         const fullName = document.querySelector('#step-2 input[type="text"]').value.trim();
         const phone = document.querySelector('#step-2 input[type="tel"]').value.trim();
 
@@ -126,8 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Authenticating...`;
         btn.disabled = true;
 
-        const email = e.target.querySelector('input[type="email"]').value.trim();
-        const password = e.target.querySelector('input[type="password"]').value;
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
 
         try {
             await signInWithEmailAndPassword(auth, email, password);
@@ -167,6 +168,38 @@ document.addEventListener('DOMContentLoaded', () => {
         if (code.includes('user-not-found') || code.includes('wrong-password') || code.includes('invalid-credential')) return 'Incorrect email or password.';
         return err.message || 'Something went wrong. Please try again.';
     }
+
+    const eyeOpenSVG = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
+    const eyeClosedSVG = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path></svg>`;
+
+    window.toggleLoginPasswordVisibility = () => {
+        const input = document.getElementById('login-password');
+        const btn = document.getElementById('login-password-eye');
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        btn.innerHTML = isHidden ? eyeClosedSVG : eyeOpenSVG;
+    };
+
+    window.toggleRegisterPasswordVisibility = () => {
+        const input = document.getElementById('register-password');
+        const btn = document.getElementById('register-password-eye');
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        btn.innerHTML = isHidden ? eyeClosedSVG : eyeOpenSVG;
+    };
+
+    window.forgotPassword = () => {
+        const email = document.getElementById('login-email').value.trim();
+        if (!email) {
+            showToast('Enter your email above first, then tap "Forgot password?"', 'error');
+            return;
+        }
+        sendPasswordResetEmail(auth, email).then(() => {
+            showToast('Password reset email sent — check your inbox', 'success');
+        }).catch((err) => {
+            showToast(friendlyAuthError(err), 'error');
+        });
+    };
 
     if (steps.length > 0) {
         steps.forEach(s => s.classList.add('opacity-0', 'translate-y-4'));

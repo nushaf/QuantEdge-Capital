@@ -302,7 +302,7 @@ function listenForRequests() {
                 <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
                     <div>
                         <h3 class="font-display font-bold text-lg">${isDeposit ? 'Deposit' : 'Withdrawal'} — $${(tx.amount ?? 0).toLocaleString()}</h3>
-                        <p class="text-gray-500 text-xs font-mono">User ID: ${tx.userId || 'Unknown'}</p>
+                        <p class="text-neonBlue text-xs font-mono">${escapeHtml(tx.userName || tx.userEmail || tx.userId || 'Unknown client')}</p>
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="text-xs text-gray-500">${time}</span>

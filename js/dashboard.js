@@ -1,5 +1,16 @@
-import { auth, ADMIN_EMAIL } from './firebase-config.js';
+import { auth, db, ADMIN_EMAIL } from './firebase-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// Live account data for the logged-in client — starts empty until Firestore loads it
+let accountData = {
+    balance: 0,
+    activePositions: 0,
+    todaysProfit: 0,
+    todaysProfitPercent: 0,
+    portfolioHistory: [],
+    recentActivity: []
+};
 
 // SPA Routing and Data
 const pages = {
@@ -38,6 +49,25 @@ onAuthStateChanged(auth, (user) => {
     const initialsEl = document.querySelector('#sidebar .w-10.h-10.rounded-full');
     if (nameEl) nameEl.textContent = name;
     if (initialsEl) initialsEl.textContent = initials;
+
+    // Live-sync account data — updates instantly whenever admin edits this client's account
+    onSnapshot(doc(db, 'users', user.uid), (snap) => {
+        if (snap.exists()) {
+            const d = snap.data();
+            accountData = {
+                balance: d.balance ?? 0,
+                activePositions: d.activePositions ?? 0,
+                todaysProfit: d.todaysProfit ?? 0,
+                todaysProfitPercent: d.todaysProfitPercent ?? 0,
+                portfolioHistory: d.portfolioHistory ?? [],
+                recentActivity: d.recentActivity ?? []
+            };
+            const activeNavEl = document.querySelector('.nav-item[data-page].bg-neonBlue');
+            if (activeNavEl) {
+                window.loadPage(activeNavEl.dataset.page);
+            }
+        }
+    });
 });
 
 // Initialize Dashboard
@@ -130,25 +160,28 @@ window.loadPage = function loadPage(page, event = null) {
 
 // Render Functions (Simulating HTML pages)
 function renderDashboard() {
+    const balanceDisplay = `$${accountData.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    const profitDisplay = `${accountData.todaysProfit >= 0 ? '+' : ''}$${accountData.todaysProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    const profitPercentDisplay = `${accountData.todaysProfitPercent >= 0 ? '+' : ''}${accountData.todaysProfitPercent}% today`;
+    const profitColor = accountData.todaysProfit >= 0 ? 'text-neonGreen' : 'text-neonRed';
+    const hasActivity = accountData.recentActivity && accountData.recentActivity.length > 0;
+
     return `
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div class="glass-panel p-6 rounded-2xl glow-blue">
             <h3 class="text-gray-400 text-sm font-medium mb-1">Total Balance</h3>
-            <p class="text-3xl font-display font-bold text-white">$124,560.80</p>
-            <p class="text-neonGreen text-sm mt-2 flex items-center gap-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                +12.5% this month
-            </p>
+            <p class="text-3xl font-display font-bold text-white">${balanceDisplay}</p>
+            <p class="text-gray-500 text-sm mt-2">${accountData.balance === 0 ? 'No funds yet' : 'Updated by QuantEdge'}</p>
         </div>
         <div class="glass-panel p-6 rounded-2xl">
             <h3 class="text-gray-400 text-sm font-medium mb-1">Active Positions</h3>
-            <p class="text-3xl font-display font-bold text-white">8</p>
-            <p class="text-neonBlue text-sm mt-2">Across 3 markets</p>
+            <p class="text-3xl font-display font-bold text-white">${accountData.activePositions}</p>
+            <p class="text-gray-500 text-sm mt-2">${accountData.activePositions === 0 ? 'No open positions' : 'Across your markets'}</p>
         </div>
         <div class="glass-panel p-6 rounded-2xl">
             <h3 class="text-gray-400 text-sm font-medium mb-1">Today's Profit</h3>
-            <p class="text-3xl font-display font-bold text-white">$1,240.50</p>
-            <p class="text-neonGreen text-sm mt-2">+2.4% today</p>
+            <p class="text-3xl font-display font-bold text-white">${profitDisplay}</p>
+            <p class="${profitColor} text-sm mt-2">${profitPercentDisplay}</p>
         </div>
     </div>
     
@@ -164,25 +197,29 @@ function renderDashboard() {
             </div>
             <div class="h-64 md:h-80 w-full relative">
                 <canvas id="mainChart"></canvas>
+                ${accountData.portfolioHistory.length === 0 ? `
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <p class="text-gray-500 text-sm">No performance data yet</p>
+                </div>` : ''}
             </div>
         </div>
         
         <div class="glass-panel p-6 rounded-2xl flex flex-col">
             <h3 class="font-display font-bold text-lg mb-4">Recent Activity</h3>
             <div class="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                ${['Bought BTC/USD', 'Sold AAPL', 'Deposit', 'Copied Trader X'].map(a => `
+                ${hasActivity ? accountData.recentActivity.map(a => `
                 <div class="flex items-center justify-between border-b border-gray-800 pb-3">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-neonBlue">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         </div>
                         <div>
-                            <p class="text-sm text-white font-medium">${a}</p>
-                            <p class="text-xs text-gray-400">Today, 14:30</p>
+                            <p class="text-sm text-white font-medium">${a.label}</p>
+                            <p class="text-xs text-gray-400">${a.date || ''}</p>
                         </div>
                     </div>
-                    <span class="text-sm font-bold ${a.includes('Sold') ? 'text-neonRed' : 'text-neonGreen'}">${a.includes('Sold') ? '-' : '+'}$${Math.floor(Math.random()*1000)}</span>
-                </div>`).join('')}
+                    <span class="text-sm font-bold ${a.amount < 0 ? 'text-neonRed' : 'text-neonGreen'}">${a.amount < 0 ? '-' : '+'}$${Math.abs(a.amount).toLocaleString()}</span>
+                </div>`).join('') : `<p class="text-gray-500 text-sm text-center py-8">No activity yet</p>`}
             </div>
         </div>
     </div>
@@ -190,14 +227,15 @@ function renderDashboard() {
 }
 
 function renderWallet() {
+    const balanceDisplay = `$${accountData.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     return `
     <div class="glass-panel p-8 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center glow-blue">
         <div>
             <h3 class="text-gray-400 text-lg mb-1">Available Balance</h3>
-            <p class="text-5xl font-display font-bold text-white">$124,560.80</p>
+            <p class="text-5xl font-display font-bold text-white">${balanceDisplay}</p>
         </div>
         <div class="flex gap-4 mt-6 md:mt-0">
-            <button onclick="showToast('Deposit initiated', 'info')" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl shadow-[0_0_15px_rgba(0,243,255,0.4)] hover:bg-opacity-80 transition-all flex items-center gap-2">
+            <button onclick="showToast('Contact us to arrange a deposit', 'info')" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl shadow-[0_0_15px_rgba(0,243,255,0.4)] hover:bg-opacity-80 transition-all flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                 Deposit
             </button>
@@ -216,8 +254,9 @@ function renderWallet() {
                     <tr><th class="p-4 rounded-tl-lg">Type</th><th class="p-4">Amount</th><th class="p-4">Status</th><th class="p-4 rounded-tr-lg">Date</th></tr>
                 </thead>
                 <tbody class="divide-y divide-gray-800">
-                    <tr><td class="p-4 font-medium">Deposit (Crypto)</td><td class="p-4 text-neonGreen">+$5,000.00</td><td class="p-4"><span class="bg-green-900/50 text-neonGreen px-2 py-1 rounded text-xs">Completed</span></td><td class="p-4 text-gray-400">Mar 25, 2026</td></tr>
-                    <tr><td class="p-4 font-medium">Withdrawal (Bank)</td><td class="p-4 text-white">-$1,200.00</td><td class="p-4"><span class="bg-yellow-900/50 text-neonGold px-2 py-1 rounded text-xs">Pending</span></td><td class="p-4 text-gray-400">Mar 24, 2026</td></tr>
+                    ${accountData.recentActivity && accountData.recentActivity.length > 0 ? accountData.recentActivity.map(a => `
+                    <tr><td class="p-4 font-medium">${a.label}</td><td class="p-4 ${a.amount < 0 ? 'text-white' : 'text-neonGreen'}">${a.amount < 0 ? '-' : '+'}$${Math.abs(a.amount).toLocaleString()}</td><td class="p-4"><span class="bg-green-900/50 text-neonGreen px-2 py-1 rounded text-xs">Completed</span></td><td class="p-4 text-gray-400">${a.date || ''}</td></tr>
+                    `).join('') : `<tr><td colspan="4" class="p-8 text-center text-gray-500">No transactions yet</td></tr>`}
                 </tbody>
             </table>
         </div>
@@ -354,13 +393,17 @@ function initChart() {
     gradient.addColorStop(0, 'rgba(0, 243, 255, 0.5)');
     gradient.addColorStop(1, 'rgba(0, 243, 255, 0.0)');
 
+    const hasHistory = accountData.portfolioHistory && accountData.portfolioHistory.length > 0;
+    const labels = hasHistory ? accountData.portfolioHistory.map(p => p.label) : ['', '', '', '', '', ''];
+    const dataPoints = hasHistory ? accountData.portfolioHistory.map(p => p.value) : [0, 0, 0, 0, 0, 0];
+
     currentChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            labels: labels,
             datasets: [{
                 label: 'Performance',
-                data: [100, 105, 102, 110, 115, 120, 118, 125, 130, 128, 135, 142],
+                data: dataPoints,
                 borderColor: '#00f3ff',
                 backgroundColor: gradient,
                 borderWidth: 3,
@@ -369,8 +412,8 @@ function initChart() {
                 pointBackgroundColor: '#050505',
                 pointBorderColor: '#00f3ff',
                 pointBorderWidth: 2,
-                pointRadius: 4,
-                pointHoverRadius: 6
+                pointRadius: hasHistory ? 4 : 0,
+                pointHoverRadius: hasHistory ? 6 : 0
             }]
         },
         options: {
@@ -379,6 +422,7 @@ function initChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    enabled: hasHistory,
                     backgroundColor: '#0f0f13',
                     titleColor: '#fff',
                     bodyColor: '#00f3ff',
@@ -396,7 +440,7 @@ function initChart() {
                 y: {
                     grid: { color: 'rgba(255,255,255,0.05)' },
                     ticks: { color: '#888' },
-                    beginAtZero: false
+                    beginAtZero: true
                 }
             }
         }

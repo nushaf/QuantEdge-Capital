@@ -16,6 +16,29 @@ window.handleLogout = () => {
     });
 };
 
+window.switchTab = (tab) => {
+    const inboxTab = document.getElementById('tab-inbox');
+    const clientsTab = document.getElementById('tab-clients');
+    const inboxPanel = document.getElementById('panel-inbox');
+    const clientsPanel = document.getElementById('panel-clients');
+
+    if (tab === 'inbox') {
+        inboxTab.classList.add('bg-neonBlue', 'text-darker');
+        inboxTab.classList.remove('text-gray-400');
+        clientsTab.classList.remove('bg-neonBlue', 'text-darker');
+        clientsTab.classList.add('text-gray-400');
+        inboxPanel.classList.remove('hidden');
+        clientsPanel.classList.add('hidden');
+    } else {
+        clientsTab.classList.add('bg-neonBlue', 'text-darker');
+        clientsTab.classList.remove('text-gray-400');
+        inboxTab.classList.remove('bg-neonBlue', 'text-darker');
+        inboxTab.classList.add('text-gray-400');
+        clientsPanel.classList.remove('hidden');
+        inboxPanel.classList.add('hidden');
+    }
+};
+
 onAuthStateChanged(auth, (user) => {
     const accessCheck = document.getElementById('access-check');
     const inboxMain = document.getElementById('inbox-main');
@@ -36,6 +59,7 @@ onAuthStateChanged(auth, (user) => {
     accessCheck.classList.add('hidden');
     inboxMain.classList.remove('hidden');
     listenForMessages();
+    listenForClients();
 });
 
 function listenForMessages() {
@@ -127,3 +151,99 @@ function escapeHtml(str) {
     div.textContent = str;
     return div.innerHTML;
 }
+
+// ---------- Clients management ----------
+let currentEditClientId = null;
+
+function listenForClients() {
+    const clientsList = document.getElementById('clients-list');
+    const emptyState = document.getElementById('clients-empty-state');
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+
+    onSnapshot(q, (snapshot) => {
+        clientsList.innerHTML = '';
+
+        // Admin's own account doc (if it exists) shouldn't show up as a "client"
+        const clientDocs = snapshot.docs.filter(d => (d.data().email || '').toLowerCase() !== ADMIN_EMAIL.toLowerCase());
+
+        if (clientDocs.length === 0) {
+            emptyState.classList.remove('hidden');
+            return;
+        }
+        emptyState.classList.add('hidden');
+
+        clientDocs.forEach((docSnap) => {
+            const client = docSnap.data();
+            const id = docSnap.id;
+            const balance = client.balance ?? 0;
+
+            const card = document.createElement('div');
+            card.className = 'glass-panel p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 reveal';
+            card.innerHTML = `
+                <div>
+                    <h3 class="font-display font-bold text-lg">${escapeHtml(client.fullName || 'Unnamed Client')}</h3>
+                    <p class="text-neonBlue text-sm font-mono">${escapeHtml(client.email || '')}</p>
+                    ${client.phone ? `<p class="text-gray-500 text-xs mt-1">${escapeHtml(client.phone)}</p>` : ''}
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500">Balance</p>
+                        <p class="font-display font-bold text-white">$${balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                    </div>
+                    <button data-id="${id}" class="edit-client-btn bg-neonBlue text-darker font-bold px-5 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Edit</button>
+                </div>
+            `;
+            clientsList.appendChild(card);
+        });
+
+        document.querySelectorAll('.edit-client-btn').forEach((btn) => {
+            const id = btn.dataset.id;
+            const client = clientDocs.find(d => d.id === id).data();
+            btn.addEventListener('click', () => openEditModal(id, client));
+        });
+    });
+}
+
+function openEditModal(id, client) {
+    currentEditClientId = id;
+    document.getElementById('edit-modal-name').textContent = `${client.fullName || 'Client'} — ${client.email || ''}`;
+    document.getElementById('edit-balance').value = client.balance ?? 0;
+    document.getElementById('edit-positions').value = client.activePositions ?? 0;
+    document.getElementById('edit-profit').value = client.todaysProfit ?? 0;
+    document.getElementById('edit-profit-percent').value = client.todaysProfitPercent ?? 0;
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+window.closeEditModal = () => {
+    currentEditClientId = null;
+    document.getElementById('edit-modal').classList.add('hidden');
+};
+
+window.saveClientEdit = async () => {
+    if (!currentEditClientId) return;
+    const btn = document.getElementById('save-client-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Saving...';
+    btn.disabled = true;
+
+    const balance = parseFloat(document.getElementById('edit-balance').value) || 0;
+    const activePositions = parseInt(document.getElementById('edit-positions').value) || 0;
+    const todaysProfit = parseFloat(document.getElementById('edit-profit').value) || 0;
+    const todaysProfitPercent = parseFloat(document.getElementById('edit-profit-percent').value) || 0;
+
+    try {
+        await updateDoc(doc(db, 'users', currentEditClientId), {
+            balance,
+            activePositions,
+            todaysProfit,
+            todaysProfitPercent
+        });
+        showToast('Client account updated — reflects live on their dashboard', 'success');
+        window.closeEditModal();
+    } catch (err) {
+        showToast('Could not save. Please try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};

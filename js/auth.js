@@ -97,7 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 fullName,
                 email,
                 phone,
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
+                // Real account starts empty — admin fills this in manually as the client deposits/trades
+                balance: 0,
+                activePositions: 0,
+                todaysProfit: 0,
+                todaysProfitPercent: 0,
+                portfolioHistory: [],
+                recentActivity: []
             });
 
             showToast('Registration successful! Redirecting to dashboard...', 'success');

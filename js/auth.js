@@ -132,6 +132,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             await signInWithEmailAndPassword(auth, email, password);
+            const rememberCheckbox = document.getElementById('remember-me');
+            if (rememberCheckbox && rememberCheckbox.checked) {
+                localStorage.setItem('qe_remember_email', email);
+            } else {
+                localStorage.removeItem('qe_remember_email');
+            }
             showToast('Login successful! Loading dashboard...', 'success');
             setTimeout(() => {
                 window.location.href = (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ? 'admin.html' : 'dashboard.html';
@@ -204,5 +210,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (steps.length > 0) {
         steps.forEach(s => s.classList.add('opacity-0', 'translate-y-4'));
         showStep(currentStep);
+    }
+
+    // If arrived via a "Log In" link, show the login form instead of the default signup form
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('mode') === 'login') {
+        document.getElementById('register-form').classList.add('hidden');
+        document.getElementById('login-form').classList.remove('hidden');
+        document.getElementById('auth-title').innerText = 'Welcome Back';
+    }
+
+    // Remember me — restores the last-used email (never the password; browsers handle that securely)
+    const rememberCheckbox = document.getElementById('remember-me');
+    const loginEmailInput = document.getElementById('login-email');
+    const savedEmail = localStorage.getItem('qe_remember_email');
+    if (savedEmail && loginEmailInput) {
+        loginEmailInput.value = savedEmail;
+        if (rememberCheckbox) rememberCheckbox.checked = true;
     }
 });

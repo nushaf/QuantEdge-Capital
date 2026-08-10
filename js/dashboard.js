@@ -54,7 +54,9 @@ let profileData = {
     address: '',
     profilePicture: '',
     kycType: '',
-    kycImage: ''
+    kycFrontImage: '',
+    kycBackImage: '',
+    kycStatus: ''
 };
 
 // SPA Routing and Data
@@ -136,7 +138,9 @@ onAuthStateChanged(auth, (user) => {
                 address: d.address ?? '',
                 profilePicture: d.profilePicture ?? '',
                 kycType: d.kycType ?? '',
-                kycImage: d.kycImage ?? ''
+                kycFrontImage: d.kycFrontImage ?? '',
+                kycBackImage: d.kycBackImage ?? '',
+                kycStatus: d.kycStatus ?? ''
             };
             updateSidebarProfile();
             rerenderIfActive(['dashboard', 'wallet', 'profile']);
@@ -628,11 +632,39 @@ function renderAlgo() {
             <h4 class="font-bold text-white mb-1">${a.name}</h4>
             <p class="text-gray-400 text-xs mb-4">${a.desc}</p>
             <p class="text-xs text-gray-500 mb-4">Win Ratio</p>
-            <button onclick="showToast('Activation requires a funded account', 'info')" class="w-full bg-neonBlue text-darker text-sm font-bold py-2.5 rounded-lg hover:shadow-[0_0_15px_#00f3ff] transition-all">Activate</button>
+            <button onclick='showAlgoDepositModal("${a.name.replace(/"/g, '&quot;')}", ${a.winRate})' class="w-full bg-neonBlue text-darker text-sm font-bold py-2.5 rounded-lg hover:shadow-[0_0_15px_#00f3ff] transition-all">Activate</button>
         </div>`).join('')}
     </div>
     `;
 }
+
+let currentAlgoDeposit = { name: '', amount: 0 };
+
+window.showAlgoDepositModal = (name, winRate) => {
+    let amount;
+    if (winRate >= 85) amount = 2000;
+    else if (winRate >= 80) amount = 1500;
+    else amount = 1000;
+
+    currentAlgoDeposit = { name, amount };
+    document.getElementById('algo-modal-name').textContent = name;
+    document.getElementById('algo-modal-amount').textContent = `$${amount.toLocaleString()}`;
+    document.getElementById('algo-deposit-modal').classList.remove('hidden');
+};
+
+window.closeAlgoDepositModal = () => {
+    document.getElementById('algo-deposit-modal').classList.add('hidden');
+};
+
+window.proceedAlgoDeposit = () => {
+    window.closeAlgoDepositModal();
+    window.loadPage('wallet');
+    setTimeout(() => {
+        window.openDepositModal();
+        const amountInput = document.getElementById('deposit-amount');
+        if (amountInput) amountInput.value = currentAlgoDeposit.amount;
+    }, 200);
+};
 
 function renderMarketUpdates() {
     return `
@@ -672,6 +704,12 @@ function renderProfile() {
             <input id="profile-pic-input" type="file" accept="image/*" class="hidden">
         </div>
         <p class="text-gray-400 text-sm">Tap the pencil to update your profile picture</p>
+        ${profileData.kycStatus === 'verified' ? `
+            <span class="mt-3 inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-neonGreen/10 text-neonGreen">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Verified Account
+            </span>
+        ` : ''}
     </div>
 
     <div class="glass-panel p-8 rounded-2xl mb-8">
@@ -706,8 +744,18 @@ function renderProfile() {
     </div>
 
     <div class="glass-panel p-8 rounded-2xl">
-        <h3 class="font-display font-bold text-lg mb-2">KYC Verification</h3>
-        <p class="text-gray-400 text-sm mb-6">Upload a valid ID document to verify your account.</p>
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="font-display font-bold text-lg">KYC Verification</h3>
+            ${profileData.kycStatus === 'verified' ? `
+                <span class="flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-neonGreen/10 text-neonGreen">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Verified Account
+                </span>
+            ` : profileData.kycStatus === 'pending' ? `
+                <span class="text-xs font-bold px-3 py-1 rounded-full bg-neonGold/10 text-neonGold">Pending Review</span>
+            ` : ''}
+        </div>
+        <p class="text-gray-400 text-sm mb-6">Upload both sides of a valid ID document to verify your account.</p>
         <div class="mb-4">
             <label class="block text-sm text-gray-400 mb-2">Document Type</label>
             <select id="kyc-type" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
@@ -715,9 +763,19 @@ function renderProfile() {
                 <option value="Driving License" ${profileData.kycType === 'Driving License' ? 'selected' : ''}>Driving License</option>
             </select>
         </div>
-        <input id="kyc-file-input" type="file" accept="image/*" class="w-full text-sm text-gray-400 mb-4 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-neonBlue file:text-darker file:font-bold hover:file:bg-opacity-80 file:cursor-pointer cursor-pointer">
-        ${profileData.kycImage ? `<img src="${profileData.kycImage}" class="max-w-xs rounded-xl border border-gray-700 mb-4">` : ''}
-        <button id="save-kyc-btn" onclick="uploadKycDocument()" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Upload Document</button>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Front Side</label>
+                <input id="kyc-front-input" type="file" accept="image/*" class="w-full text-sm text-gray-400 mb-3 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-neonBlue file:text-darker file:font-bold hover:file:bg-opacity-80 file:cursor-pointer cursor-pointer">
+                ${profileData.kycFrontImage ? `<img src="${profileData.kycFrontImage}" class="w-full rounded-xl border border-gray-700">` : ''}
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Back Side</label>
+                <input id="kyc-back-input" type="file" accept="image/*" class="w-full text-sm text-gray-400 mb-3 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-neonBlue file:text-darker file:font-bold hover:file:bg-opacity-80 file:cursor-pointer cursor-pointer">
+                ${profileData.kycBackImage ? `<img src="${profileData.kycBackImage}" class="w-full rounded-xl border border-gray-700">` : ''}
+            </div>
+        </div>
+        <button id="save-kyc-btn" onclick="uploadKycDocument()" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Upload Documents</button>
     </div>
     `;
 }
@@ -772,25 +830,33 @@ window.saveProfileInfo = async () => {
 };
 
 window.uploadKycDocument = async () => {
-    const fileInput = document.getElementById('kyc-file-input');
-    const file = fileInput.files[0];
-    if (!file) {
-        showToast('Choose a document file first', 'error');
+    const frontFile = document.getElementById('kyc-front-input').files[0];
+    const backFile = document.getElementById('kyc-back-input').files[0];
+
+    if (!frontFile && !profileData.kycFrontImage) {
+        showToast('Upload the front side of your document', 'error');
         return;
     }
+    if (!backFile && !profileData.kycBackImage) {
+        showToast('Upload the back side of your document', 'error');
+        return;
+    }
+
     const btn = document.getElementById('save-kyc-btn');
     const originalText = btn.innerHTML;
     btn.innerHTML = 'Uploading...';
     btn.disabled = true;
 
     try {
-        const compressed = await compressImage(file);
-        await updateDoc(doc(db, 'users', currentUserId), {
+        const updates = {
             kycType: document.getElementById('kyc-type').value,
-            kycImage: compressed,
             kycStatus: 'pending'
-        });
-        showToast('Document uploaded for review', 'success');
+        };
+        if (frontFile) updates.kycFrontImage = await compressImage(frontFile);
+        if (backFile) updates.kycBackImage = await compressImage(backFile);
+
+        await updateDoc(doc(db, 'users', currentUserId), updates);
+        showToast('Documents uploaded for review', 'success');
     } catch (err) {
         showToast('Could not upload. Please try again.', 'error');
     } finally {
@@ -904,7 +970,7 @@ window.sendSecurityPasswordReset = () => {
 
 function renderSupport() {
     return `
-    <div class="glass-panel p-8 rounded-2xl max-w-2xl">
+    <div class="glass-panel p-8 rounded-2xl max-w-2xl mb-8">
         <h3 class="font-display font-bold text-xl mb-2">Get in Touch</h3>
         <p class="text-gray-400 text-sm mb-6">Send us a message and our team will respond as soon as possible.</p>
         <form id="support-form" class="space-y-6">
@@ -925,37 +991,74 @@ function renderSupport() {
             <button type="submit" class="w-full md:w-auto bg-neonBlue text-darker font-bold px-8 py-4 rounded-xl shadow-[0_0_15px_rgba(0,243,255,0.4)] hover:shadow-[0_0_25px_rgba(0,243,255,0.5)] transition-all">Send Message</button>
         </form>
     </div>
+
+    <div class="max-w-2xl">
+        <h3 class="font-display font-bold text-lg mb-4">Your Messages</h3>
+        <div id="support-history" class="space-y-4">
+            <p class="text-gray-500 text-sm">Loading...</p>
+        </div>
+    </div>
     `;
 }
 
 function initSupportPage() {
     const form = document.getElementById('support-form');
-    if (!form) return;
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = form.querySelector('button[type="submit"]');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = 'Sending...';
-        btn.disabled = true;
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Sending...';
+            btn.disabled = true;
 
-        try {
-            await addDoc(collection(db, 'messages'), {
-                name: `${document.getElementById('sup-first-name').value.trim()} ${document.getElementById('sup-last-name').value.trim()}`.trim(),
-                email: currentUserEmail,
-                message: document.getElementById('sup-message').value.trim(),
-                userId: currentUserId,
-                status: 'unread',
-                reply: null,
-                createdAt: serverTimestamp()
-            });
-            showToast('Message sent successfully!', 'success');
-            form.reset();
-        } catch (err) {
-            showToast('Could not send message. Please try again.', 'error');
-        } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+            try {
+                await addDoc(collection(db, 'messages'), {
+                    name: `${document.getElementById('sup-first-name').value.trim()} ${document.getElementById('sup-last-name').value.trim()}`.trim(),
+                    email: currentUserEmail,
+                    message: document.getElementById('sup-message').value.trim(),
+                    userId: currentUserId,
+                    status: 'unread',
+                    reply: null,
+                    createdAt: serverTimestamp()
+                });
+                showToast('Message sent successfully!', 'success');
+                form.reset();
+            } catch (err) {
+                showToast('Could not send message. Please try again.', 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        });
+    }
+
+    // Live list of this client's own messages + admin replies
+    const q = query(collection(db, 'messages'), where('userId', '==', currentUserId));
+    onSnapshot(q, (snapshot) => {
+        const historyEl = document.getElementById('support-history');
+        if (!historyEl) return;
+
+        let msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        msgs.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+
+        if (msgs.length === 0) {
+            historyEl.innerHTML = `<p class="text-gray-500 text-sm">No messages yet.</p>`;
+            return;
         }
+
+        historyEl.innerHTML = msgs.map(m => {
+            const dateStr = m.createdAt && m.createdAt.toDate ? m.createdAt.toDate().toLocaleDateString() : '';
+            return `
+            <div class="glass-panel p-5 rounded-xl">
+                <p class="text-xs text-gray-500 mb-1">${dateStr}</p>
+                <p class="text-white text-sm mb-3">${(m.message || '').replace(/</g, '&lt;')}</p>
+                ${m.reply ? `
+                <div class="border-t border-gray-800 pt-3 mt-3">
+                    <p class="text-xs text-neonBlue font-bold mb-1">Reply from admin</p>
+                    <p class="text-gray-300 text-sm">${(m.reply || '').replace(/</g, '&lt;')}</p>
+                </div>` : `<p class="text-xs text-neonGold">Awaiting reply</p>`}
+            </div>`;
+        }).join('');
     });
 }
 

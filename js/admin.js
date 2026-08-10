@@ -104,7 +104,7 @@ function listenForMessages() {
                 ` : `
                     <div class="border-t border-gray-800 pt-4">
                         <textarea id="reply-${id}" rows="3" placeholder="Type your reply..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue focus:ring-1 focus:ring-neonBlue outline-none transition-all resize-none mb-3"></textarea>
-                        <button data-id="${id}" data-email="${escapeHtml(msg.email || '')}" class="reply-btn bg-neonBlue text-darker font-bold px-6 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Send Reply</button>
+                        <button data-id="${id}" data-email="${escapeHtml(msg.email || '')}" data-userid="${msg.userId || ''}" class="reply-btn bg-neonBlue text-darker font-bold px-6 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Send Reply</button>
                     </div>
                 `}
             `;
@@ -113,12 +113,12 @@ function listenForMessages() {
 
         // Wire up reply buttons
         document.querySelectorAll('.reply-btn').forEach((btn) => {
-            btn.addEventListener('click', () => handleReply(btn.dataset.id, btn.dataset.email));
+            btn.addEventListener('click', () => handleReply(btn.dataset.id, btn.dataset.email, btn.dataset.userid));
         });
     });
 }
 
-async function handleReply(messageId, clientEmail) {
+async function handleReply(messageId, clientEmail, userId) {
     const textarea = document.getElementById(`reply-${messageId}`);
     const replyText = textarea.value.trim();
 
@@ -135,12 +135,16 @@ async function handleReply(messageId, clientEmail) {
             repliedAt: serverTimestamp()
         });
 
-        // Open the admin's email client, pre-filled, to actually send it to the client
-        const subject = encodeURIComponent('Re: Your message to QuantEdge Capital');
-        const body = encodeURIComponent(replyText);
-        window.location.href = `mailto:${clientEmail}?subject=${subject}&body=${body}`;
-
-        showToast('Reply saved — your email app will open to send it', 'success');
+        if (userId && userId !== 'null' && userId !== 'undefined') {
+            // Registered client — they'll see your reply right on their Get in Touch page
+            showToast('Reply saved — visible to the client in their Support page', 'success');
+        } else {
+            // Guest (not logged in) — only reachable by email
+            const subject = encodeURIComponent('Re: Your message to QuantEdge Capital');
+            const body = encodeURIComponent(replyText);
+            window.location.href = `mailto:${clientEmail}?subject=${subject}&body=${body}`;
+            showToast('Reply saved — your email app will open to send it', 'success');
+        }
     } catch (err) {
         showToast('Could not save reply. Please try again.', 'error');
     }
@@ -177,19 +181,29 @@ function listenForClients() {
             const id = docSnap.id;
             const balance = client.balance ?? 0;
 
+            const kycBadge = client.kycStatus === 'verified'
+                ? `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-neonGreen/10 text-neonGreen">Verified</span>`
+                : client.kycStatus === 'pending'
+                ? `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-neonGold/10 text-neonGold">KYC Pending</span>`
+                : `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-800 text-gray-400">No KYC</span>`;
+
             const card = document.createElement('div');
             card.className = 'glass-panel p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 reveal';
             card.innerHTML = `
                 <div>
-                    <h3 class="font-display font-bold text-lg">${escapeHtml(client.fullName || 'Unnamed Client')}</h3>
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 class="font-display font-bold text-lg">${escapeHtml(client.fullName || 'Unnamed Client')}</h3>
+                        ${kycBadge}
+                    </div>
                     <p class="text-neonBlue text-sm font-mono">${escapeHtml(client.email || '')}</p>
-                    ${client.phone ? `<p class="text-gray-500 text-xs mt-1">${escapeHtml(client.phone)}</p>` : ''}
+                    <p class="text-gray-500 text-xs mt-1">Contact: ${client.phone ? escapeHtml(client.phone) : 'Not provided'}</p>
                 </div>
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3 flex-wrap">
                     <div class="text-right">
                         <p class="text-xs text-gray-500">Balance</p>
                         <p class="font-display font-bold text-white">$${balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                     </div>
+                    ${client.kycFrontImage ? `<button data-id="${id}" class="review-kyc-btn bg-transparent border border-neonBlue text-neonBlue font-bold px-5 py-2.5 rounded-xl hover:bg-neonBlue hover:text-darker transition-all text-sm">Review KYC</button>` : ''}
                     <button data-id="${id}" class="edit-client-btn bg-neonBlue text-darker font-bold px-5 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Edit</button>
                 </div>
             `;
@@ -200,6 +214,12 @@ function listenForClients() {
             const id = btn.dataset.id;
             const client = clientDocs.find(d => d.id === id).data();
             btn.addEventListener('click', () => openEditModal(id, client));
+        });
+
+        document.querySelectorAll('.review-kyc-btn').forEach((btn) => {
+            const id = btn.dataset.id;
+            const client = clientDocs.find(d => d.id === id).data();
+            btn.addEventListener('click', () => openKycModal(id, client));
         });
     });
 }
@@ -218,6 +238,44 @@ function openEditModal(id, client) {
 window.closeEditModal = () => {
     currentEditClientId = null;
     document.getElementById('edit-modal').classList.add('hidden');
+};
+
+let currentKycClientId = null;
+
+function openKycModal(id, client) {
+    currentKycClientId = id;
+    document.getElementById('kyc-modal-name').textContent = `${client.fullName || 'Client'} — ${client.email || ''}`;
+    document.getElementById('kyc-modal-type').textContent = client.kycType || 'Not specified';
+    document.getElementById('kyc-modal-front').src = client.kycFrontImage || '';
+    document.getElementById('kyc-modal-back').src = client.kycBackImage || '';
+    document.getElementById('kyc-modal').classList.remove('hidden');
+}
+
+window.closeKycModal = () => {
+    currentKycClientId = null;
+    document.getElementById('kyc-modal').classList.add('hidden');
+};
+
+window.verifyKyc = async () => {
+    if (!currentKycClientId) return;
+    try {
+        await updateDoc(doc(db, 'users', currentKycClientId), { kycStatus: 'verified' });
+        showToast('Client marked as verified', 'success');
+        window.closeKycModal();
+    } catch (err) {
+        showToast('Could not update. Please try again.', 'error');
+    }
+};
+
+window.rejectKyc = async () => {
+    if (!currentKycClientId) return;
+    try {
+        await updateDoc(doc(db, 'users', currentKycClientId), { kycStatus: 'rejected' });
+        showToast('KYC marked as rejected', 'info');
+        window.closeKycModal();
+    } catch (err) {
+        showToast('Could not update. Please try again.', 'error');
+    }
 };
 
 window.saveClientEdit = async () => {

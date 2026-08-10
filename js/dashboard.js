@@ -852,13 +852,13 @@ window.uploadKycDocument = async () => {
             kycType: document.getElementById('kyc-type').value,
             kycStatus: 'pending'
         };
-        if (frontFile) updates.kycFrontImage = await compressImage(frontFile);
-        if (backFile) updates.kycBackImage = await compressImage(backFile);
+        if (frontFile) updates.kycFrontImage = await compressImage(frontFile, 650, 0.5);
+        if (backFile) updates.kycBackImage = await compressImage(backFile, 650, 0.5);
 
         await updateDoc(doc(db, 'users', currentUserId), updates);
         showToast('Documents uploaded for review', 'success');
     } catch (err) {
-        showToast('Could not upload. Please try again.', 'error');
+        showToast(err.message || 'Could not upload. Please try again.', 'error');
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
@@ -1243,19 +1243,18 @@ window.copyToClipboard = (elId) => {
     });
 };
 
-function compressImage(file) {
+function compressImage(file, maxWidth = 800, quality = 0.6) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-                const maxWidth = 800;
                 const scale = Math.min(1, maxWidth / img.width);
                 const canvas = document.createElement('canvas');
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
                 canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/jpeg', 0.6));
+                resolve(canvas.toDataURL('image/jpeg', quality));
             };
             img.onerror = reject;
             img.src = e.target.result;

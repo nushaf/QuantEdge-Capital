@@ -8,6 +8,7 @@ import {
     doc,
     updateDoc,
     setDoc,
+    deleteDoc,
     increment,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -16,6 +17,25 @@ window.handleLogout = () => {
     signOut(auth).then(() => {
         window.location.href = 'index.html';
     });
+};
+
+function trashIconBtn(collectionName, id, extraClass = '') {
+    return `<button onclick="deleteRecord('${collectionName}', '${id}')" class="text-gray-500 hover:text-neonRed transition-colors ${extraClass}" title="Delete">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+    </button>`;
+}
+
+window.deleteRecord = async (collectionName, id) => {
+    const labels = { messages: 'this message', transactions: 'this request', users: "this client's account data" };
+    const confirmed = window.confirm(`Delete ${labels[collectionName] || 'this record'}? This only removes it from your admin dashboard and cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+        await deleteDoc(doc(db, collectionName, id));
+        showToast('Deleted', 'success');
+    } catch (err) {
+        showToast('Could not delete. Please try again.', 'error');
+    }
 };
 
 window.switchTab = (tab) => {
@@ -93,6 +113,7 @@ function listenForMessages() {
                     <div class="flex items-center gap-3">
                         <span class="text-xs text-gray-500">${time}</span>
                         <span class="text-xs font-bold px-3 py-1 rounded-full ${isReplied ? 'bg-neonGreen/10 text-neonGreen' : 'bg-neonGold/10 text-neonGold'}">${isReplied ? 'Replied' : 'Unread'}</span>
+                        ${trashIconBtn('messages', id)}
                     </div>
                 </div>
                 <p class="text-gray-300 mb-6 leading-relaxed">${escapeHtml(msg.message || '')}</p>
@@ -205,6 +226,7 @@ function listenForClients() {
                     </div>
                     ${client.kycFrontImage ? `<button data-id="${id}" class="review-kyc-btn bg-transparent border border-neonBlue text-neonBlue font-bold px-5 py-2.5 rounded-xl hover:bg-neonBlue hover:text-darker transition-all text-sm">Review KYC</button>` : ''}
                     <button data-id="${id}" class="edit-client-btn bg-neonBlue text-darker font-bold px-5 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Edit</button>
+                    ${trashIconBtn('users', id)}
                 </div>
             `;
             clientsList.appendChild(card);
@@ -365,6 +387,7 @@ function listenForRequests() {
                     <div class="flex items-center gap-3">
                         <span class="text-xs text-gray-500">${time}</span>
                         ${statusBadge}
+                        ${trashIconBtn('transactions', id)}
                     </div>
                 </div>
                 <div class="mb-4">${detailsHtml}</div>

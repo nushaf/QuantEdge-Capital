@@ -12,7 +12,7 @@
 <body class="bg-darker text-white font-sans flex h-screen overflow-hidden">
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-darkCard border-r border-gray-800 flex flex-col transition-all duration-300 relative z-20">
+    <aside id="sidebar" class="w-64 bg-darkCard border-r border-gray-800 flex flex-col transition-transform duration-300 fixed md:relative inset-y-0 left-0 z-40 -translate-x-full md:translate-x-0">
         <div class="p-6 border-b border-gray-800 flex items-center justify-between">
             <h1 class="font-display font-bold text-xl tracking-tight text-white flex items-center gap-2" id="sidebar-logo-text">
                 <span class="w-8 h-8 rounded-lg bg-neonBlue shadow-[0_0_10px_rgba(0,243,255,0.5)] flex items-center justify-center text-darker font-bold">Q</span>
@@ -31,28 +31,34 @@
         
         <div class="p-4 border-t border-gray-800">
             <div class="flex items-center gap-3 glass p-3 rounded-xl cursor-pointer hover:bg-gray-800 transition-colors">
-                <div class="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center font-bold text-darker">JD</div>
+                <div class="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center font-bold text-darker overflow-hidden">JD</div>
                 <div class="sidebar-text">
                     <p class="text-sm font-bold text-white">John Doe</p>
                 </div>
             </div>
-            <button onclick="logout()" class="mt-3 w-full flex items-center gap-3 px-4 py-2 text-sm text-neonRed hover:bg-[rgba(255,51,102,0.1)] rounded-lg transition-colors sidebar-text">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                Logout
+            <button onclick="logout()" class="mt-3 w-full flex items-center gap-3 px-4 py-2 text-sm text-neonRed hover:bg-[rgba(255,51,102,0.1)] rounded-lg transition-colors">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <span class="sidebar-text">Logout</span>
             </button>
         </div>
     </aside>
+
+    <!-- Mobile sidebar backdrop -->
+    <div id="sidebar-backdrop" class="hidden fixed inset-0 bg-black/60 z-30 md:hidden"></div>
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col bg-mesh-dark relative h-full overflow-hidden">
         
         <!-- Topheader -->
-        <header class="h-16 border-b border-gray-800 glass-panel flex items-center justify-between px-6 z-10">
-            <h2 id="page-title" class="text-xl font-display font-bold text-glow-blue">Dashboard</h2>
+        <header class="h-16 border-b border-gray-800 glass-panel flex items-center gap-3 px-4 md:px-6 z-10">
+            <button id="mobile-sidebar-btn" class="md:hidden text-gray-300 hover:text-white p-1 flex-shrink-0">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <h2 id="page-title" class="text-lg md:text-xl font-display font-bold text-glow-blue truncate">Dashboard</h2>
         </header>
 
         <!-- Page Content Area -->
-        <div id="content-area" class="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+        <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
             <!-- Dynamic Content Injected Here -->
         </div>
     </main>

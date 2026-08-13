@@ -185,10 +185,39 @@ document.addEventListener('DOMContentLoaded', () => {
         navLinks.appendChild(li);
     });
 
-    // Sidebar Toggle
+    // Sidebar Toggle — behaves differently on mobile (slide-in drawer) vs desktop (collapse to icons)
     let isCollapsed = false;
+    const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
+
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+
+    function openMobileSidebar() {
+        sidebar.classList.remove('-translate-x-full');
+        backdrop.classList.remove('hidden');
+    }
+    function closeMobileSidebar() {
+        sidebar.classList.add('-translate-x-full');
+        backdrop.classList.add('hidden');
+    }
+
+    document.getElementById('mobile-sidebar-btn').addEventListener('click', openMobileSidebar);
+    backdrop.addEventListener('click', closeMobileSidebar);
+
+    // Close the mobile drawer automatically after picking a page
+    document.getElementById('nav-links').addEventListener('click', (e) => {
+        if (isMobile() && e.target.closest('a')) {
+            closeMobileSidebar();
+        }
+    });
+
     document.getElementById('toggle-sidebar').addEventListener('click', () => {
-        const sidebar = document.getElementById('sidebar');
+        if (isMobile()) {
+            // On mobile this button lives inside the open drawer — just close it
+            closeMobileSidebar();
+            return;
+        }
+
         const texts = document.querySelectorAll('.sidebar-text');
         const logoText = document.getElementById('sidebar-logo-text');
         

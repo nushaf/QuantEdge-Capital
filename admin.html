@@ -41,6 +41,7 @@
         </div>
 
         <div id="panel-inbox">
+            <input id="messages-search" type="text" placeholder="Search by client email..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none mb-6">
             <div id="messages-list" class="space-y-6">
                 <!-- Messages injected here -->
             </div>
@@ -48,6 +49,7 @@
         </div>
 
         <div id="panel-clients" class="hidden">
+            <input id="clients-search" type="text" placeholder="Search by client email..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none mb-6">
             <div id="clients-list" class="space-y-4">
                 <!-- Clients injected here -->
             </div>
@@ -55,6 +57,7 @@
         </div>
 
         <div id="panel-requests" class="hidden">
+            <input id="requests-search" type="text" placeholder="Search by client email..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none mb-6">
             <div id="requests-list" class="space-y-6">
                 <!-- Deposit/withdrawal requests injected here -->
             </div>
@@ -135,12 +138,12 @@
             <p class="text-gray-500 text-sm mb-6">Document type: <span id="kyc-modal-type" class="text-white"></span></p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div>
-                    <p class="text-xs text-gray-500 mb-2">Front Side</p>
-                    <img id="kyc-modal-front" class="w-full rounded-xl border border-gray-700" alt="Front side">
+                    <p class="text-xs text-gray-500 mb-2">Front Side (click to enlarge)</p>
+                    <img id="kyc-modal-front" class="w-full h-40 object-cover rounded-xl border border-gray-700 cursor-zoom-in hover:opacity-80 transition-opacity" alt="Front side">
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500 mb-2">Back Side</p>
-                    <img id="kyc-modal-back" class="w-full rounded-xl border border-gray-700" alt="Back side">
+                    <p class="text-xs text-gray-500 mb-2">Back Side (click to enlarge)</p>
+                    <img id="kyc-modal-back" class="w-full h-40 object-cover rounded-xl border border-gray-700 cursor-zoom-in hover:opacity-80 transition-opacity" alt="Back side">
                 </div>
             </div>
             <div class="flex gap-3">
@@ -149,6 +152,11 @@
                 <button onclick="verifyKyc()" class="flex-1 bg-neonGreen/10 border border-neonGreen text-neonGreen font-bold py-3 rounded-xl hover:bg-neonGreen hover:text-darker transition-all">Verify</button>
             </div>
         </div>
+    </div>
+
+    <!-- Image lightbox -->
+    <div id="image-lightbox" onclick="closeLightbox()" class="hidden fixed inset-0 bg-black/90 z-[70] flex items-center justify-center p-4 cursor-zoom-out">
+        <img id="lightbox-img" class="max-w-full max-h-full rounded-xl" alt="Full size view">
     </div>
 
     <script src="js/main.js"></script>

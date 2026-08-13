@@ -19,6 +19,15 @@ window.handleLogout = () => {
     });
 };
 
+window.openLightbox = (src) => {
+    if (!src) return;
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('image-lightbox').classList.remove('hidden');
+};
+window.closeLightbox = () => {
+    document.getElementById('image-lightbox').classList.add('hidden');
+};
+
 function trashIconBtn(collectionName, id, extraClass = '') {
     return `<button onclick="deleteRecord('${collectionName}', '${id}')" class="text-neonRed hover:text-red-300 hover:scale-110 transition-all ${extraClass}" title="Delete">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -82,60 +91,75 @@ onAuthStateChanged(auth, (user) => {
     loadPaymentSettings();
 });
 
+let allMessages = [];
+
 function listenForMessages() {
-    const messagesList = document.getElementById('messages-list');
-    const emptyState = document.getElementById('empty-state');
     const q = query(collection(db, 'messages'), orderBy('createdAt', 'desc'));
 
     onSnapshot(q, (snapshot) => {
-        messagesList.innerHTML = '';
+        allMessages = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderMessages();
+    });
 
-        if (snapshot.empty) {
-            emptyState.classList.remove('hidden');
-            return;
-        }
-        emptyState.classList.add('hidden');
+    document.getElementById('messages-search').addEventListener('input', renderMessages);
+}
 
-        snapshot.forEach((docSnap) => {
-            const msg = docSnap.data();
-            const id = docSnap.id;
-            const isReplied = msg.status === 'replied';
-            const time = msg.createdAt && msg.createdAt.toDate ? msg.createdAt.toDate().toLocaleString() : 'Just now';
+function renderMessages() {
+    const messagesList = document.getElementById('messages-list');
+    const emptyState = document.getElementById('empty-state');
+    const searchTerm = (document.getElementById('messages-search').value || '').trim().toLowerCase();
 
-            const card = document.createElement('div');
-            card.className = 'glass-panel p-6 md:p-8 rounded-2xl reveal';
-            card.innerHTML = `
-                <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
-                    <div>
-                        <h3 class="font-display font-bold text-lg">${escapeHtml(msg.name || 'Unknown')}</h3>
-                        <a href="mailto:${escapeHtml(msg.email || '')}" class="text-neonBlue text-sm font-mono hover:underline">${escapeHtml(msg.email || '')}</a>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-xs text-gray-500">${time}</span>
-                        <span class="text-xs font-bold px-3 py-1 rounded-full ${isReplied ? 'bg-neonGreen/10 text-neonGreen' : 'bg-neonGold/10 text-neonGold'}">${isReplied ? 'Replied' : 'Unread'}</span>
-                        ${trashIconBtn('messages', id)}
-                    </div>
+    const filtered = searchTerm
+        ? allMessages.filter(m => (m.email || '').toLowerCase().includes(searchTerm))
+        : allMessages;
+
+    messagesList.innerHTML = '';
+
+    if (filtered.length === 0) {
+        emptyState.textContent = searchTerm ? 'No messages found for that email.' : 'No messages yet. New client messages will show up here automatically.';
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    emptyState.classList.add('hidden');
+
+    filtered.forEach((msg) => {
+        const id = msg.id;
+        const isReplied = msg.status === 'replied';
+        const time = msg.createdAt && msg.createdAt.toDate ? msg.createdAt.toDate().toLocaleString() : 'Just now';
+
+        const card = document.createElement('div');
+        card.className = 'glass-panel p-6 md:p-8 rounded-2xl reveal';
+        card.innerHTML = `
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="font-display font-bold text-lg">${escapeHtml(msg.name || 'Unknown')}</h3>
+                    <a href="mailto:${escapeHtml(msg.email || '')}" class="text-neonBlue text-sm font-mono hover:underline">${escapeHtml(msg.email || '')}</a>
                 </div>
-                <p class="text-gray-300 mb-6 leading-relaxed">${escapeHtml(msg.message || '')}</p>
-                ${isReplied ? `
-                    <div class="border-t border-gray-800 pt-4">
-                        <p class="text-xs text-gray-500 mb-1">Your reply:</p>
-                        <p class="text-sm text-gray-400">${escapeHtml(msg.reply || '')}</p>
-                    </div>
-                ` : `
-                    <div class="border-t border-gray-800 pt-4">
-                        <textarea id="reply-${id}" rows="3" placeholder="Type your reply..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue focus:ring-1 focus:ring-neonBlue outline-none transition-all resize-none mb-3"></textarea>
-                        <button data-id="${id}" data-email="${escapeHtml(msg.email || '')}" data-userid="${msg.userId || ''}" class="reply-btn bg-neonBlue text-darker font-bold px-6 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Send Reply</button>
-                    </div>
-                `}
-            `;
-            messagesList.appendChild(card);
-        });
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-500">${time}</span>
+                    <span class="text-xs font-bold px-3 py-1 rounded-full ${isReplied ? 'bg-neonGreen/10 text-neonGreen' : 'bg-neonGold/10 text-neonGold'}">${isReplied ? 'Replied' : 'Unread'}</span>
+                    ${trashIconBtn('messages', id)}
+                </div>
+            </div>
+            <p class="text-gray-300 mb-6 leading-relaxed">${escapeHtml(msg.message || '')}</p>
+            ${isReplied ? `
+                <div class="border-t border-gray-800 pt-4">
+                    <p class="text-xs text-gray-500 mb-1">Your reply:</p>
+                    <p class="text-sm text-gray-400">${escapeHtml(msg.reply || '')}</p>
+                </div>
+            ` : `
+                <div class="border-t border-gray-800 pt-4">
+                    <textarea id="reply-${id}" rows="3" placeholder="Type your reply..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue focus:ring-1 focus:ring-neonBlue outline-none transition-all resize-none mb-3"></textarea>
+                    <button data-id="${id}" data-email="${escapeHtml(msg.email || '')}" data-userid="${msg.userId || ''}" class="reply-btn bg-neonBlue text-darker font-bold px-6 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Send Reply</button>
+                </div>
+            `}
+        `;
+        messagesList.appendChild(card);
+    });
 
-        // Wire up reply buttons
-        document.querySelectorAll('.reply-btn').forEach((btn) => {
-            btn.addEventListener('click', () => handleReply(btn.dataset.id, btn.dataset.email, btn.dataset.userid));
-        });
+    // Wire up reply buttons
+    document.querySelectorAll('.reply-btn').forEach((btn) => {
+        btn.addEventListener('click', () => handleReply(btn.dataset.id, btn.dataset.email, btn.dataset.userid));
     });
 }
 
@@ -179,70 +203,84 @@ function escapeHtml(str) {
 
 // ---------- Clients management ----------
 let currentEditClientId = null;
+let allClients = [];
 
 function listenForClients() {
-    const clientsList = document.getElementById('clients-list');
-    const emptyState = document.getElementById('clients-empty-state');
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
 
     onSnapshot(q, (snapshot) => {
-        clientsList.innerHTML = '';
-
         // Admin's own account doc (if it exists) shouldn't show up as a "client"
-        const clientDocs = snapshot.docs.filter(d => (d.data().email || '').toLowerCase() !== ADMIN_EMAIL.toLowerCase());
+        allClients = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(c => (c.email || '').toLowerCase() !== ADMIN_EMAIL.toLowerCase());
+        renderClients();
+    });
 
-        if (clientDocs.length === 0) {
-            emptyState.classList.remove('hidden');
-            return;
-        }
-        emptyState.classList.add('hidden');
+    document.getElementById('clients-search').addEventListener('input', renderClients);
+}
 
-        clientDocs.forEach((docSnap) => {
-            const client = docSnap.data();
-            const id = docSnap.id;
-            const balance = client.balance ?? 0;
+function renderClients() {
+    const clientsList = document.getElementById('clients-list');
+    const emptyState = document.getElementById('clients-empty-state');
+    const searchTerm = (document.getElementById('clients-search').value || '').trim().toLowerCase();
 
-            const kycBadge = client.kycStatus === 'verified'
-                ? `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-neonGreen/10 text-neonGreen">Verified</span>`
-                : client.kycStatus === 'pending'
-                ? `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-neonGold/10 text-neonGold">KYC Pending</span>`
-                : `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-800 text-gray-400">No KYC</span>`;
+    const filtered = searchTerm
+        ? allClients.filter(c => (c.email || '').toLowerCase().includes(searchTerm))
+        : allClients;
 
-            const card = document.createElement('div');
-            card.className = 'glass-panel p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 reveal';
-            card.innerHTML = `
-                <div>
-                    <div class="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 class="font-display font-bold text-lg">${escapeHtml(client.fullName || 'Unnamed Client')}</h3>
-                        ${kycBadge}
-                    </div>
-                    <p class="text-neonBlue text-sm font-mono">${escapeHtml(client.email || '')}</p>
-                    <p class="text-gray-500 text-xs mt-1">Contact: ${client.phone ? escapeHtml(client.phone) : 'Not provided'}</p>
+    clientsList.innerHTML = '';
+
+    if (filtered.length === 0) {
+        emptyState.textContent = searchTerm ? 'No clients found for that email.' : 'No registered clients yet.';
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    emptyState.classList.add('hidden');
+
+    filtered.forEach((client) => {
+        const id = client.id;
+        const balance = client.balance ?? 0;
+
+        const kycBadge = client.kycStatus === 'verified'
+            ? `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-neonGreen/10 text-neonGreen">Verified</span>`
+            : client.kycStatus === 'pending'
+            ? `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-neonGold/10 text-neonGold">KYC Pending</span>`
+            : `<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-800 text-gray-400">No KYC</span>`;
+
+        const card = document.createElement('div');
+        card.className = 'glass-panel p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 reveal';
+        card.innerHTML = `
+            <div>
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 class="font-display font-bold text-lg">${escapeHtml(client.fullName || 'Unnamed Client')}</h3>
+                    ${kycBadge}
                 </div>
-                <div class="flex items-center gap-3 flex-wrap">
-                    <div class="text-right">
-                        <p class="text-xs text-gray-500">Balance</p>
-                        <p class="font-display font-bold text-white">$${balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                    </div>
-                    ${client.kycFrontImage ? `<button data-id="${id}" class="review-kyc-btn bg-transparent border border-neonBlue text-neonBlue font-bold px-5 py-2.5 rounded-xl hover:bg-neonBlue hover:text-darker transition-all text-sm">Review KYC</button>` : ''}
-                    <button data-id="${id}" class="edit-client-btn bg-neonBlue text-darker font-bold px-5 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Edit</button>
-                    ${trashIconBtn('users', id)}
+                <p class="text-neonBlue text-sm font-mono">${escapeHtml(client.email || '')}</p>
+                <p class="text-gray-500 text-xs mt-1">Contact: ${client.phone ? escapeHtml(client.phone) : 'Not provided'}</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <div class="text-right">
+                    <p class="text-xs text-gray-500">Balance</p>
+                    <p class="font-display font-bold text-white">$${balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                 </div>
-            `;
-            clientsList.appendChild(card);
-        });
+                ${client.kycFrontImage ? `<button data-id="${id}" class="review-kyc-btn bg-transparent border border-neonBlue text-neonBlue font-bold px-5 py-2.5 rounded-xl hover:bg-neonBlue hover:text-darker transition-all text-sm">Review KYC</button>` : ''}
+                <button data-id="${id}" class="edit-client-btn bg-neonBlue text-darker font-bold px-5 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Edit</button>
+                ${trashIconBtn('users', id)}
+            </div>
+        `;
+        clientsList.appendChild(card);
+    });
 
-        document.querySelectorAll('.edit-client-btn').forEach((btn) => {
-            const id = btn.dataset.id;
-            const client = clientDocs.find(d => d.id === id).data();
-            btn.addEventListener('click', () => openEditModal(id, client));
-        });
+    document.querySelectorAll('.edit-client-btn').forEach((btn) => {
+        const id = btn.dataset.id;
+        const client = filtered.find(c => c.id === id);
+        btn.addEventListener('click', () => openEditModal(id, client));
+    });
 
-        document.querySelectorAll('.review-kyc-btn').forEach((btn) => {
-            const id = btn.dataset.id;
-            const client = clientDocs.find(d => d.id === id).data();
-            btn.addEventListener('click', () => openKycModal(id, client));
-        });
+    document.querySelectorAll('.review-kyc-btn').forEach((btn) => {
+        const id = btn.dataset.id;
+        const client = filtered.find(c => c.id === id);
+        btn.addEventListener('click', () => openKycModal(id, client));
     });
 }
 
@@ -268,8 +306,12 @@ function openKycModal(id, client) {
     currentKycClientId = id;
     document.getElementById('kyc-modal-name').textContent = `${client.fullName || 'Client'} — ${client.email || ''}`;
     document.getElementById('kyc-modal-type').textContent = client.kycType || 'Not specified';
-    document.getElementById('kyc-modal-front').src = client.kycFrontImage || '';
-    document.getElementById('kyc-modal-back').src = client.kycBackImage || '';
+    const frontImg = document.getElementById('kyc-modal-front');
+    const backImg = document.getElementById('kyc-modal-back');
+    frontImg.src = client.kycFrontImage || '';
+    backImg.src = client.kycBackImage || '';
+    frontImg.onclick = () => window.openLightbox(client.kycFrontImage);
+    backImg.onclick = () => window.openLightbox(client.kycBackImage);
     document.getElementById('kyc-modal').classList.remove('hidden');
 }
 
@@ -332,81 +374,99 @@ window.saveClientEdit = async () => {
 };
 
 // ---------- Deposit / Withdrawal requests ----------
+let allRequests = [];
+
 function listenForRequests() {
-    const list = document.getElementById('requests-list');
-    const emptyState = document.getElementById('requests-empty-state');
     const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'));
 
     onSnapshot(q, (snapshot) => {
-        list.innerHTML = '';
+        allRequests = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderRequests();
+    });
 
-        if (snapshot.empty) {
-            emptyState.classList.remove('hidden');
-            return;
-        }
-        emptyState.classList.add('hidden');
+    document.getElementById('requests-search').addEventListener('input', renderRequests);
+}
 
-        snapshot.forEach((docSnap) => {
-            const tx = docSnap.data();
-            const id = docSnap.id;
-            const isDeposit = tx.type === 'deposit';
-            const isPending = tx.status === 'pending';
-            const time = tx.createdAt && tx.createdAt.toDate ? tx.createdAt.toDate().toLocaleString() : 'Just now';
+function renderRequests() {
+    const list = document.getElementById('requests-list');
+    const emptyState = document.getElementById('requests-empty-state');
+    const searchTerm = (document.getElementById('requests-search').value || '').trim().toLowerCase();
 
-            let statusBadge;
-            if (tx.status === 'pending') statusBadge = `<span class="text-xs font-bold px-3 py-1 rounded-full bg-neonGold/10 text-neonGold">${isDeposit ? 'Deposit Pending' : 'Withdrawal Pending'}</span>`;
-            else if (tx.status === 'approved') statusBadge = `<span class="text-xs font-bold px-3 py-1 rounded-full bg-neonGreen/10 text-neonGreen">${isDeposit ? 'Deposit Approved' : 'Withdrawal Completed'}</span>`;
-            else statusBadge = `<span class="text-xs font-bold px-3 py-1 rounded-full bg-neonRed/10 text-neonRed">Rejected</span>`;
+    const filtered = searchTerm
+        ? allRequests.filter(tx => (tx.userEmail || '').toLowerCase().includes(searchTerm))
+        : allRequests;
 
-            let detailsHtml = '';
-            if (isDeposit) {
-                detailsHtml = `
-                    <p class="text-sm text-gray-400 mb-2">Method: <span class="text-white">${tx.method === 'wallet' ? 'Crypto Wallet' : 'Bank Transfer'}</span></p>
-                    ${tx.proofImage ? `<img src="${tx.proofImage}" class="max-w-xs rounded-xl border border-gray-700 mt-2" alt="Payment proof">` : `<p class="text-gray-500 text-sm">No proof image attached</p>`}
-                `;
-            } else {
-                if (tx.method === 'wallet') {
-                    detailsHtml = `<p class="text-sm text-gray-400">Send to wallet: <span class="text-neonBlue font-mono break-all">${escapeHtml(tx.destination?.walletAddress || '')}</span></p>`;
-                } else {
-                    detailsHtml = `
-                        <p class="text-sm text-gray-400">Account Holder: <span class="text-white">${escapeHtml(tx.destination?.accountHolder || '')}</span></p>
-                        <p class="text-sm text-gray-400">Bank: <span class="text-white">${escapeHtml(tx.destination?.bankName || '')}</span></p>
-                        <p class="text-sm text-gray-400">Account No: <span class="text-white font-mono">${escapeHtml(tx.destination?.accountNumber || '')}</span></p>
-                    `;
-                }
-            }
+    list.innerHTML = '';
 
-            const card = document.createElement('div');
-            card.className = 'glass-panel p-6 md:p-8 rounded-2xl reveal';
-            card.innerHTML = `
-                <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
-                    <div>
-                        <h3 class="font-display font-bold text-lg">${isDeposit ? 'Deposit' : 'Withdrawal'} — $${(tx.amount ?? 0).toLocaleString()}</h3>
-                        <p class="text-neonBlue text-xs font-mono">${escapeHtml(tx.userName || tx.userEmail || tx.userId || 'Unknown client')}</p>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-xs text-gray-500">${time}</span>
-                        ${statusBadge}
-                        ${trashIconBtn('transactions', id)}
-                    </div>
-                </div>
-                <div class="mb-4">${detailsHtml}</div>
-                ${isPending ? `
-                    <div class="flex gap-3 border-t border-gray-800 pt-4">
-                        <button data-id="${id}" data-type="${tx.type}" data-amount="${tx.amount}" data-user="${tx.userId}" class="approve-btn flex-1 bg-neonGreen/10 border border-neonGreen text-neonGreen font-bold py-2.5 rounded-xl hover:bg-neonGreen hover:text-darker transition-all text-sm">Approve</button>
-                        <button data-id="${id}" class="reject-btn flex-1 bg-neonRed/10 border border-neonRed text-neonRed font-bold py-2.5 rounded-xl hover:bg-neonRed hover:text-white transition-all text-sm">Reject</button>
-                    </div>
-                ` : ''}
+    if (filtered.length === 0) {
+        emptyState.textContent = searchTerm ? 'No requests found for that email.' : 'No deposit or withdrawal requests yet.';
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    emptyState.classList.add('hidden');
+
+    filtered.forEach((tx) => {
+        const id = tx.id;
+        const isDeposit = tx.type === 'deposit';
+        const isPending = tx.status === 'pending';
+        const time = tx.createdAt && tx.createdAt.toDate ? tx.createdAt.toDate().toLocaleString() : 'Just now';
+
+        let statusBadge;
+        if (tx.status === 'pending') statusBadge = `<span class="text-xs font-bold px-3 py-1 rounded-full bg-neonGold/10 text-neonGold">${isDeposit ? 'Deposit Pending' : 'Withdrawal Pending'}</span>`;
+        else if (tx.status === 'approved') statusBadge = `<span class="text-xs font-bold px-3 py-1 rounded-full bg-neonGreen/10 text-neonGreen">${isDeposit ? 'Deposit Approved' : 'Withdrawal Completed'}</span>`;
+        else statusBadge = `<span class="text-xs font-bold px-3 py-1 rounded-full bg-neonRed/10 text-neonRed">Rejected</span>`;
+
+        let detailsHtml = '';
+        if (isDeposit) {
+            detailsHtml = `
+                <p class="text-sm text-gray-400 mb-2">Method: <span class="text-white">${tx.method === 'wallet' ? 'Crypto Wallet' : 'Bank Transfer'}</span></p>
+                ${tx.proofImage ? `<img src="${tx.proofImage}" class="proof-thumb w-28 h-28 object-cover rounded-xl border border-gray-700 mt-2 cursor-zoom-in hover:opacity-80 transition-opacity" alt="Payment proof (click to enlarge)">` : `<p class="text-gray-500 text-sm">No proof image attached</p>`}
             `;
-            list.appendChild(card);
-        });
+        } else {
+            if (tx.method === 'wallet') {
+                detailsHtml = `<p class="text-sm text-gray-400">Send to wallet: <span class="text-neonBlue font-mono break-all">${escapeHtml(tx.destination?.walletAddress || '')}</span></p>`;
+            } else {
+                detailsHtml = `
+                    <p class="text-sm text-gray-400">Account Holder: <span class="text-white">${escapeHtml(tx.destination?.accountHolder || '')}</span></p>
+                    <p class="text-sm text-gray-400">Bank: <span class="text-white">${escapeHtml(tx.destination?.bankName || '')}</span></p>
+                    <p class="text-sm text-gray-400">Account No: <span class="text-white font-mono">${escapeHtml(tx.destination?.accountNumber || '')}</span></p>
+                `;
+            }
+        }
 
-        document.querySelectorAll('.approve-btn').forEach((btn) => {
-            btn.addEventListener('click', () => approveRequest(btn.dataset.id, btn.dataset.type, parseFloat(btn.dataset.amount), btn.dataset.user));
-        });
-        document.querySelectorAll('.reject-btn').forEach((btn) => {
-            btn.addEventListener('click', () => rejectRequest(btn.dataset.id));
-        });
+        const card = document.createElement('div');
+        card.className = 'glass-panel p-6 md:p-8 rounded-2xl reveal';
+        card.innerHTML = `
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="font-display font-bold text-lg">${isDeposit ? 'Deposit' : 'Withdrawal'} — $${(tx.amount ?? 0).toLocaleString()}</h3>
+                    <p class="text-neonBlue text-xs font-mono">${escapeHtml(tx.userName || tx.userEmail || tx.userId || 'Unknown client')}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-500">${time}</span>
+                    ${statusBadge}
+                    ${trashIconBtn('transactions', id)}
+                </div>
+            </div>
+            <div class="mb-4">${detailsHtml}</div>
+            ${isPending ? `
+                <div class="flex gap-3 border-t border-gray-800 pt-4">
+                    <button data-id="${id}" data-type="${tx.type}" data-amount="${tx.amount}" data-user="${tx.userId}" class="approve-btn flex-1 bg-neonGreen/10 border border-neonGreen text-neonGreen font-bold py-2.5 rounded-xl hover:bg-neonGreen hover:text-darker transition-all text-sm">Approve</button>
+                    <button data-id="${id}" class="reject-btn flex-1 bg-neonRed/10 border border-neonRed text-neonRed font-bold py-2.5 rounded-xl hover:bg-neonRed hover:text-white transition-all text-sm">Reject</button>
+                </div>
+            ` : ''}
+        `;
+        list.appendChild(card);
+    });
+
+    document.querySelectorAll('.approve-btn').forEach((btn) => {
+        btn.addEventListener('click', () => approveRequest(btn.dataset.id, btn.dataset.type, parseFloat(btn.dataset.amount), btn.dataset.user));
+    });
+    document.querySelectorAll('.reject-btn').forEach((btn) => {
+        btn.addEventListener('click', () => rejectRequest(btn.dataset.id));
+    });
+    document.querySelectorAll('.proof-thumb').forEach((imgEl) => {
+        imgEl.addEventListener('click', () => window.openLightbox(imgEl.src));
     });
 }
 

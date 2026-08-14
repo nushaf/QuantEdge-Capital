@@ -6,6 +6,7 @@
     <title>QuantEdge Capital - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="js/tailwind-config.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -83,6 +84,24 @@
             <div class="flex gap-3">
                 <button onclick="closeAlgoDepositModal()" class="flex-1 border border-gray-600 text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-800 transition-all">Cancel</button>
                 <button onclick="proceedAlgoDeposit()" class="flex-1 bg-neonBlue text-darker font-bold py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Deposit Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Order confirmation modal -->
+    <div id="order-modal" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-2xl w-full max-w-sm">
+            <h3 class="font-display font-bold text-xl mb-1"><span id="order-modal-side"></span> — <span id="order-modal-symbol" class="text-neonBlue"></span></h3>
+            <p class="text-gray-400 text-sm mb-6"><span id="order-modal-type-label"></span></p>
+            <div class="space-y-3 mb-6 text-sm">
+                <div class="flex justify-between"><span class="text-gray-400">Lot Size</span><span id="order-modal-lot" class="font-mono text-white"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Entry Price</span><span id="order-modal-entry" class="font-mono text-white"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Stop Loss</span><span id="order-modal-sl" class="font-mono text-white"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Take Profit</span><span id="order-modal-tp" class="font-mono text-white"></span></div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeOrderModal()" class="flex-1 border border-gray-600 text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-800 transition-all">Cancel</button>
+                <button id="order-confirm-btn" onclick="confirmOrder()" class="flex-1 bg-neonBlue text-darker font-bold py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Confirm</button>
             </div>
         </div>
     </div>

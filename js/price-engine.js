@@ -46,10 +46,10 @@ function startSimulatedFeed(symbol) {
     setInterval(() => {
         // gentle mean-reverting random walk so prices don't drift wildly over long sessions
         const drift = (SEED_PRICES[symbol] - currentPrices[symbol]) * 0.002;
-        const noise = (Math.random() - 0.5) * vol;
+        const noise = (Math.random() - 0.5) * vol * 0.6;
         currentPrices[symbol] = Math.max(0.0001, currentPrices[symbol] + drift + noise);
         notify(symbol);
-    }, 1200 + Math.random() * 800);
+    }, 350 + Math.random() * 400);
 }
 
 function startBinanceFeed(symbol) {

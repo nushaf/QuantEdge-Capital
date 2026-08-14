@@ -749,18 +749,28 @@ function drawTradeLines() {
     lwPriceLines = [];
 
     const relevant = userTrades.filter(t => t.symbol === activeTradingSymbol.symbol && (t.status === 'open' || t.status === 'pending'));
+
+    const markers = relevant.filter(t => t.status === 'open').map(t => ({
+        time: Math.floor((t.createdAt?.toMillis?.() ?? Date.now()) / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS,
+        position: t.side === 'buy' ? 'belowBar' : 'aboveBar',
+        color: t.side === 'buy' ? '#00ff66' : '#ff3366',
+        shape: t.side === 'buy' ? 'arrowUp' : 'arrowDown',
+        text: `${t.side.toUpperCase()} ${t.lotSize}`
+    }));
+    lwSeries.setMarkers(markers);
+
     relevant.forEach(t => {
         lwPriceLines.push(lwSeries.createPriceLine({
             price: t.entryPrice, color: '#00f3ff', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
-            axisLabelVisible: true, title: t.status === 'pending' ? 'Pending Entry' : 'Entry'
+            axisLabelVisible: true, title: t.status === 'pending' ? 'Pending Entry' : `${t.side.toUpperCase()} Entry`
         }));
         if (t.sl) lwPriceLines.push(lwSeries.createPriceLine({
-            price: t.sl, color: '#ff3366', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-            axisLabelVisible: true, title: 'SL'
+            price: t.sl, color: '#ff3366', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true, title: 'Stop Loss'
         }));
         if (t.tp) lwPriceLines.push(lwSeries.createPriceLine({
-            price: t.tp, color: '#00ff66', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-            axisLabelVisible: true, title: 'TP'
+            price: t.tp, color: '#00ff66', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true, title: 'Take Profit'
         }));
     });
 }
@@ -965,7 +975,7 @@ function startTradeTickLoop() {
         if (activeNavEl && activeNavEl.dataset.page === 'trading') {
             renderTradeTables();
         }
-    }, 2000);
+    }, 1000);
 }
 
 

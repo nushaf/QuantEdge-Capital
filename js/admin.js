@@ -4,6 +4,7 @@ import {
     collection,
     query,
     orderBy,
+    where,
     onSnapshot,
     doc,
     updateDoc,
@@ -48,8 +49,8 @@ window.deleteRecord = async (collectionName, id) => {
 };
 
 window.switchTab = (tab) => {
-    const tabs = { inbox: 'tab-inbox', clients: 'tab-clients', requests: 'tab-requests', settings: 'tab-settings' };
-    const panels = { inbox: 'panel-inbox', clients: 'panel-clients', requests: 'panel-requests', settings: 'panel-settings' };
+    const tabs = { inbox: 'tab-inbox', clients: 'tab-clients', requests: 'tab-requests', trading: 'tab-trading', settings: 'tab-settings' };
+    const panels = { inbox: 'panel-inbox', clients: 'panel-clients', requests: 'panel-requests', trading: 'panel-trading', settings: 'panel-settings' };
 
     Object.keys(tabs).forEach((key) => {
         const tabEl = document.getElementById(tabs[key]);
@@ -89,6 +90,7 @@ onAuthStateChanged(auth, (user) => {
     listenForClients();
     listenForRequests();
     loadPaymentSettings();
+    initTradingTab();
 });
 
 let allMessages = [];
@@ -282,6 +284,9 @@ function renderClients() {
         const client = filtered.find(c => c.id === id);
         btn.addEventListener('click', () => openKycModal(id, client));
     });
+
+    // Keep the Trading tab's client picker in sync with the same underlying data
+    if (typeof renderTradingClientList === 'function') renderTradingClientList();
 }
 
 function openEditModal(id, client) {
@@ -538,6 +543,156 @@ window.savePaymentSettings = async () => {
         showToast('Payment details updated — live for all clients now', 'success');
     } catch (err) {
         showToast('Could not save. Please try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
+// ---------- Trading oversight ----------
+let selectedTradingClientId = null;
+let unsubscribeClientTrades = null;
+let clientOpenPositions = [];
+let currentCloseTradeId = null;
+let currentCloseOutcome = 'profit';
+
+function initTradingTab() {
+    document.getElementById('trading-search').addEventListener('input', renderTradingClientList);
+}
+
+function renderTradingClientList() {
+    const listEl = document.getElementById('trading-clients-list');
+    const emptyEl = document.getElementById('trading-clients-empty');
+    const searchTerm = (document.getElementById('trading-search').value || '').trim().toLowerCase();
+
+    const filtered = searchTerm
+        ? allClients.filter(c => (c.email || '').toLowerCase().includes(searchTerm))
+        : allClients;
+
+    listEl.innerHTML = '';
+
+    if (filtered.length === 0) {
+        emptyEl.textContent = searchTerm ? 'No clients found for that email.' : 'No registered clients yet.';
+        emptyEl.classList.remove('hidden');
+        return;
+    }
+    emptyEl.classList.add('hidden');
+
+    filtered.forEach((client) => {
+        const card = document.createElement('div');
+        card.className = 'glass-panel p-6 rounded-2xl flex items-center justify-between gap-4 reveal cursor-pointer hover:border-neonBlue/40 transition-all';
+        card.innerHTML = `
+            <div>
+                <h3 class="font-display font-bold text-lg">${escapeHtml(client.fullName || 'Unnamed Client')}</h3>
+                <p class="text-neonBlue text-sm font-mono">${escapeHtml(client.email || '')}</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        `;
+        card.addEventListener('click', () => openTradingClientDetail(client));
+        listEl.appendChild(card);
+    });
+}
+
+function openTradingClientDetail(client) {
+    selectedTradingClientId = client.id;
+    document.getElementById('trading-client-list-view').classList.add('hidden');
+    document.getElementById('trading-client-detail-view').classList.remove('hidden');
+    document.getElementById('trading-detail-name').textContent = client.fullName || 'Unnamed Client';
+    document.getElementById('trading-detail-email').textContent = client.email || '';
+
+    if (unsubscribeClientTrades) unsubscribeClientTrades();
+    const q = query(collection(db, 'trades'), where('userId', '==', client.id));
+    unsubscribeClientTrades = onSnapshot(q, (snapshot) => {
+        clientOpenPositions = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(t => t.status === 'open');
+        renderClientPositions();
+    });
+}
+
+window.backToTradingClientList = () => {
+    selectedTradingClientId = null;
+    if (unsubscribeClientTrades) { unsubscribeClientTrades(); unsubscribeClientTrades = null; }
+    document.getElementById('trading-client-detail-view').classList.add('hidden');
+    document.getElementById('trading-client-list-view').classList.remove('hidden');
+};
+
+function renderClientPositions() {
+    const listEl = document.getElementById('trading-positions-list');
+    const emptyEl = document.getElementById('trading-positions-empty');
+
+    if (clientOpenPositions.length === 0) {
+        listEl.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        return;
+    }
+    emptyEl.classList.add('hidden');
+
+    listEl.innerHTML = clientOpenPositions.map(t => `
+        <div class="glass-panel p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h4 class="font-display font-bold">${escapeHtml(t.label || t.symbol)} <span class="${t.side === 'buy' ? 'text-neonGreen' : 'text-neonRed'} text-sm font-bold ml-2">${(t.side || '').toUpperCase()}</span></h4>
+                <p class="text-gray-400 text-xs mt-1">Lot ${t.lotSize} · Entry ${t.entryPrice} ${t.sl ? `· SL ${t.sl}` : ''} ${t.tp ? `· TP ${t.tp}` : ''}</p>
+            </div>
+            <button data-id="${t.id}" data-label="${escapeHtml(t.label || t.symbol)}" class="admin-close-trade-btn bg-neonBlue text-darker font-bold px-6 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Close Position</button>
+        </div>
+    `).join('');
+
+    document.querySelectorAll('.admin-close-trade-btn').forEach((btn) => {
+        btn.addEventListener('click', () => openAdminCloseModal(btn.dataset.id, btn.dataset.label));
+    });
+}
+
+function openAdminCloseModal(tradeId, label) {
+    currentCloseTradeId = tradeId;
+    document.getElementById('admin-close-trade-label').textContent = label;
+    document.getElementById('admin-close-amount').value = '';
+    window.setCloseOutcome('profit');
+    document.getElementById('admin-close-trade-modal').classList.remove('hidden');
+}
+
+window.setCloseOutcome = (outcome) => {
+    currentCloseOutcome = outcome;
+    const profitBtn = document.getElementById('outcome-profit-btn');
+    const lossBtn = document.getElementById('outcome-loss-btn');
+    profitBtn.classList.toggle('bg-neonGreen', outcome === 'profit');
+    profitBtn.classList.toggle('text-darker', outcome === 'profit');
+    profitBtn.classList.toggle('text-gray-400', outcome !== 'profit');
+    lossBtn.classList.toggle('bg-neonRed', outcome === 'loss');
+    lossBtn.classList.toggle('text-white', outcome === 'loss');
+    lossBtn.classList.toggle('text-gray-400', outcome !== 'loss');
+};
+
+window.closeAdminTradeModal = () => {
+    currentCloseTradeId = null;
+    document.getElementById('admin-close-trade-modal').classList.add('hidden');
+};
+
+window.confirmAdminCloseTrade = async () => {
+    if (!currentCloseTradeId || !selectedTradingClientId) return;
+    const amountRaw = parseFloat(document.getElementById('admin-close-amount').value);
+    if (isNaN(amountRaw) || amountRaw < 0) {
+        showToast('Enter a valid amount', 'error');
+        return;
+    }
+    const pnl = currentCloseOutcome === 'profit' ? amountRaw : -amountRaw;
+
+    const btn = document.getElementById('admin-close-confirm-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Closing...';
+    btn.disabled = true;
+
+    try {
+        await updateDoc(doc(db, 'trades', currentCloseTradeId), {
+            status: 'closed', pnl, closeReason: 'admin', closedAt: serverTimestamp()
+        });
+        await updateDoc(doc(db, 'users', selectedTradingClientId), {
+            balance: increment(pnl), totalProfit: increment(pnl)
+        });
+        showToast('Position closed and balance updated', 'success');
+        window.closeAdminTradeModal();
+    } catch (err) {
+        showToast('Could not close position. Please try again.', 'error');
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;

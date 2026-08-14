@@ -12,12 +12,20 @@ import {
     doc,
     onSnapshot,
     updateDoc,
+    deleteDoc,
+    increment,
     collection,
     query,
     where,
     addDoc,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import {
+    getPrice as getLivePrice,
+    subscribe as subscribeLivePrice,
+    isLiveSymbol
+} from './price-engine.js';
 
 // Live account data for the logged-in client — starts empty until Firestore loads it
 let accountData = {
@@ -43,6 +51,10 @@ let paymentSettings = {
 let clientTransactions = [];
 let currentUserId = null;
 let currentUserEmail = null;
+
+// Live list of this client's trades (open/pending/closed)
+let userTrades = [];
+let tickLoopStarted = false;
 
 // Live profile data (personal info + KYC + profile picture)
 let profileData = {
@@ -161,6 +173,18 @@ onAuthStateChanged(auth, (user) => {
         clientTransactions.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
         rerenderIfActive(['wallet', 'transactions']);
     });
+
+    // Live-sync this client's trades (open/pending/closed) — this listener plus the tick loop below
+    // keep running regardless of which dashboard page is currently open, so TP/SL still trigger
+    // while the tab is open even if you're not looking at the Trading page.
+    const tradesQuery = query(collection(db, 'trades'), where('userId', '==', user.uid));
+    onSnapshot(tradesQuery, (snapshot) => {
+        userTrades = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        userTrades.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+        rerenderIfActive(['trading']);
+    });
+
+    startTradeTickLoop();
 });
 
 // Initialize Dashboard
@@ -436,6 +460,35 @@ function renderWallet() {
     `;
 }
 
+const PAIR_CONFIG = {
+    'FX:EURUSD': { pointValue: 100000, decimals: 4 },
+    'FX:GBPUSD': { pointValue: 100000, decimals: 4 },
+    'FX:USDJPY': { pointValue: 100000, decimals: 2 },
+    'FX:AUDUSD': { pointValue: 100000, decimals: 4 },
+    'FX:USDCAD': { pointValue: 100000, decimals: 4 },
+    'FX:USDCHF': { pointValue: 100000, decimals: 4 },
+    'FX:NZDUSD': { pointValue: 100000, decimals: 4 },
+    'BINANCE:BTCUSDT': { pointValue: 1, decimals: 2 },
+    'BINANCE:ETHUSDT': { pointValue: 1, decimals: 2 },
+    'BINANCE:SOLUSDT': { pointValue: 1, decimals: 3 },
+    'BINANCE:XRPUSDT': { pointValue: 1, decimals: 4 },
+    'BINANCE:BNBUSDT': { pointValue: 1, decimals: 2 },
+    'TVC:GOLD': { pointValue: 100, decimals: 2 },
+    'TVC:SILVER': { pointValue: 100, decimals: 3 },
+    'TVC:USOIL': { pointValue: 1000, decimals: 2 },
+    'TVC:UKOIL': { pointValue: 1000, decimals: 2 },
+    'TVC:DJI': { pointValue: 10, decimals: 1 },
+    'TVC:NDX': { pointValue: 10, decimals: 1 },
+    'TVC:UKX': { pointValue: 10, decimals: 1 },
+    'TVC:DAX': { pointValue: 10, decimals: 1 },
+    'NASDAQ:AAPL': { pointValue: 1, decimals: 2 },
+    'NASDAQ:TSLA': { pointValue: 1, decimals: 2 },
+    'NASDAQ:NVDA': { pointValue: 1, decimals: 2 },
+    'NASDAQ:MSFT': { pointValue: 1, decimals: 2 },
+    'NASDAQ:AMZN': { pointValue: 1, decimals: 2 },
+    'NASDAQ:GOOGL': { pointValue: 1, decimals: 2 }
+};
+
 const TRADING_PAIRS = [
     { symbol: 'FX:EURUSD', label: 'EUR/USD', category: 'Forex' },
     { symbol: 'FX:GBPUSD', label: 'GBP/USD', category: 'Forex' },
@@ -465,6 +518,23 @@ const TRADING_PAIRS = [
     { symbol: 'NASDAQ:GOOGL', label: 'Google', category: 'Stocks' }
 ];
 let activeTradingSymbol = TRADING_PAIRS[0];
+let lwChart = null;
+let lwSeries = null;
+let lwPriceLines = [];
+let unsubscribeChartFeed = null;
+let currentCandle = null;
+const CANDLE_BUCKET_SECONDS = 5;
+
+function fmtPrice(symbol, price) {
+    const decimals = (PAIR_CONFIG[symbol] || { decimals: 4 }).decimals;
+    return price.toFixed(decimals);
+}
+
+function pnlFor(trade, livePrice) {
+    const cfg = PAIR_CONFIG[trade.symbol] || { pointValue: 1 };
+    const direction = trade.side === 'buy' ? 1 : -1;
+    return (livePrice - trade.entryPrice) * direction * trade.lotSize * cfg.pointValue;
+}
 
 function renderTrading() {
     return `
@@ -473,14 +543,31 @@ function renderTrading() {
     </div>
 
     <div class="glass-panel p-4 md:p-6 rounded-2xl mb-6">
-        <input id="pair-search" type="text" placeholder="Search pairs — EUR/USD, BTC, Gold, Apple..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none mb-4">
+        <input id="pair-search" type="text" placeholder="Search pairs \u2014 EUR/USD, BTC, Gold, Apple..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none mb-4">
         <div id="pair-list" class="flex flex-wrap gap-2 mb-4 max-h-28 overflow-y-auto custom-scrollbar"></div>
-        <div id="tv-chart-container" class="h-[450px] md:h-[550px] w-full rounded-xl overflow-hidden bg-black/30"></div>
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <span id="active-symbol-label" class="font-display font-bold text-lg text-white"></span>
+                <span id="active-symbol-tag" class="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400"></span>
+            </div>
+            <div class="text-right">
+                <span id="live-price-display" class="font-mono text-xl font-bold text-neonBlue"></span>
+            </div>
+        </div>
+        <div id="lw-chart-container" class="h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden bg-black/30"></div>
     </div>
 
-    <div class="glass-panel p-6 rounded-2xl">
-        <h3 class="font-display font-bold text-lg mb-6">Place Order — <span id="active-symbol-label" class="text-neonBlue"></span></h3>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="glass-panel p-6 rounded-2xl mb-6">
+        <h3 class="font-display font-bold text-lg mb-6">Place Order \u2014 <span id="order-symbol-label" class="text-neonBlue"></span></h3>
+        <div class="flex gap-2 mb-6 bg-[rgba(255,255,255,0.03)] border border-gray-800 rounded-xl p-1 w-fit">
+            <button id="order-type-market-btn" onclick="setOrderType('market')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all bg-neonBlue text-darker">Market</button>
+            <button id="order-type-limit-btn" onclick="setOrderType('limit')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Limit (Pending)</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+            <div id="limit-entry-field" class="hidden">
+                <label class="block text-xs text-gray-400 mb-2">Entry Price</label>
+                <input id="order-entry" type="number" step="0.0001" class="w-full bg-gray-800 border-none rounded-lg py-3 px-3 focus:ring-1 ring-neonBlue text-sm font-mono">
+            </div>
             <div>
                 <label class="block text-xs text-gray-400 mb-2">Lot Size</label>
                 <input id="order-lot" type="number" step="0.01" min="0.01" value="0.01" class="w-full bg-gray-800 border-none rounded-lg py-3 px-3 focus:ring-1 ring-neonBlue text-sm font-mono">
@@ -495,12 +582,60 @@ function renderTrading() {
             </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-            <button onclick="placeOrder('sell')" class="bg-neonRed bg-opacity-10 hover:bg-neonRed hover:text-white text-neonRed border border-neonRed font-bold py-4 rounded-xl transition-all">SELL</button>
-            <button onclick="placeOrder('buy')" class="bg-neonGreen bg-opacity-10 hover:bg-neonGreen hover:text-darker text-neonGreen border border-neonGreen font-bold py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(0,255,102,0.15)]">BUY</button>
+            <button onclick="initiateOrder('sell')" class="bg-neonRed bg-opacity-10 hover:bg-neonRed hover:text-white text-neonRed border border-neonRed font-bold py-4 rounded-xl transition-all">SELL</button>
+            <button onclick="initiateOrder('buy')" class="bg-neonGreen bg-opacity-10 hover:bg-neonGreen hover:text-darker text-neonGreen border border-neonGreen font-bold py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(0,255,102,0.15)]">BUY</button>
+        </div>
+    </div>
+
+    <div class="glass-panel p-6 rounded-2xl mb-6">
+        <h3 class="font-display font-bold text-lg mb-4">Running Positions</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-gray-800 text-gray-400">
+                    <tr><th class="p-3 rounded-tl-lg">Symbol</th><th class="p-3">Side</th><th class="p-3">Lot</th><th class="p-3">Entry</th><th class="p-3">SL / TP</th><th class="p-3">P/L</th><th class="p-3 rounded-tr-lg"></th></tr>
+                </thead>
+                <tbody id="open-positions-body" class="divide-y divide-gray-800"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="glass-panel p-6 rounded-2xl mb-6">
+        <h3 class="font-display font-bold text-lg mb-4">Pending Orders</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-gray-800 text-gray-400">
+                    <tr><th class="p-3 rounded-tl-lg">Symbol</th><th class="p-3">Side</th><th class="p-3">Lot</th><th class="p-3">Entry Target</th><th class="p-3">SL / TP</th><th class="p-3 rounded-tr-lg"></th></tr>
+                </thead>
+                <tbody id="pending-orders-body" class="divide-y divide-gray-800"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="glass-panel p-6 rounded-2xl">
+        <h3 class="font-display font-bold text-lg mb-4">Closed Trades</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-gray-800 text-gray-400">
+                    <tr><th class="p-3 rounded-tl-lg">Symbol</th><th class="p-3">Side</th><th class="p-3">Lot</th><th class="p-3">Entry</th><th class="p-3">Close</th><th class="p-3">P/L</th><th class="p-3 rounded-tr-lg">Reason</th></tr>
+                </thead>
+                <tbody id="closed-trades-body" class="divide-y divide-gray-800"></tbody>
+            </table>
         </div>
     </div>
     `;
 }
+
+let currentOrderType = 'market';
+window.setOrderType = (type) => {
+    currentOrderType = type;
+    document.getElementById('order-type-market-btn').classList.toggle('bg-neonBlue', type === 'market');
+    document.getElementById('order-type-market-btn').classList.toggle('text-darker', type === 'market');
+    document.getElementById('order-type-market-btn').classList.toggle('text-gray-400', type !== 'market');
+    document.getElementById('order-type-limit-btn').classList.toggle('bg-neonBlue', type === 'limit');
+    document.getElementById('order-type-limit-btn').classList.toggle('text-darker', type === 'limit');
+    document.getElementById('order-type-limit-btn').classList.toggle('text-gray-400', type !== 'limit');
+    document.getElementById('limit-entry-field').classList.toggle('hidden', type !== 'limit');
+};
 
 function initTradingPage() {
     injectTVWidget('trading-ticker-container', 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js', {
@@ -514,7 +649,9 @@ function initTradingPage() {
     });
 
     renderPairList(TRADING_PAIRS);
+    currentOrderType = 'market';
     selectTradingPair(activeTradingSymbol);
+    renderTradeTables();
 
     const searchInput = document.getElementById('pair-search');
     if (searchInput) {
@@ -541,35 +678,296 @@ window.selectTradingPairBySymbol = (symbol) => {
     if (pair) selectTradingPair(pair);
 };
 
+function buildInitialCandles(symbol) {
+    const seedPrice = getLivePrice(symbol);
+    const cfg = PAIR_CONFIG[symbol] || { decimals: 4 };
+    const vol = seedPrice * 0.0015;
+    const candles = [];
+    let price = seedPrice - vol * 20;
+    const nowBucket = Math.floor(Date.now() / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS;
+    for (let i = 60; i >= 1; i--) {
+        const time = nowBucket - i * CANDLE_BUCKET_SECONDS;
+        const open = price;
+        const change = (Math.random() - 0.48) * vol;
+        price = Math.max(0.0001, price + change);
+        const close = price;
+        const high = Math.max(open, close) + Math.random() * vol * 0.5;
+        const low = Math.min(open, close) - Math.random() * vol * 0.5;
+        candles.push({ time, open, high, low, close });
+    }
+    return candles;
+}
+
 function selectTradingPair(pair) {
+    if (unsubscribeChartFeed) { unsubscribeChartFeed(); unsubscribeChartFeed = null; }
+
     activeTradingSymbol = pair;
-    const label = document.getElementById('active-symbol-label');
-    if (label) label.textContent = pair.label;
+    document.getElementById('active-symbol-label').textContent = pair.label;
+    document.getElementById('active-symbol-tag').textContent = isLiveSymbol(pair.symbol) ? 'LIVE' : pair.category;
+    document.getElementById('order-symbol-label').textContent = pair.label;
     renderPairList(TRADING_PAIRS);
 
-    injectTVWidget('tv-chart-container', 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js', {
-        autosize: true,
-        symbol: pair.symbol,
-        interval: '60',
-        timezone: 'Etc/UTC',
-        theme: 'dark',
-        style: '1',
-        locale: 'en',
-        enable_publishing: false,
-        backgroundColor: 'rgba(5,5,5,1)',
-        gridColor: 'rgba(255,255,255,0.06)',
-        hide_top_toolbar: false,
-        hide_legend: false,
-        save_image: false,
-        calendar: false,
-        support_host: 'https://www.tradingview.com'
+    const container = document.getElementById('lw-chart-container');
+    container.innerHTML = '';
+    lwChart = LightweightCharts.createChart(container, {
+        layout: { background: { color: 'transparent' }, textColor: '#9ca3af' },
+        grid: { vertLines: { color: 'rgba(255,255,255,0.06)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
+        timeScale: { timeVisible: true, secondsVisible: true, borderColor: 'rgba(255,255,255,0.1)' },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+        autoSize: true
+    });
+    lwSeries = lwChart.addCandlestickSeries({
+        upColor: '#00ff66', downColor: '#ff3366',
+        borderUpColor: '#00ff66', borderDownColor: '#ff3366',
+        wickUpColor: '#00ff66', wickDownColor: '#ff3366'
+    });
+
+    const initialCandles = buildInitialCandles(pair.symbol);
+    lwSeries.setData(initialCandles);
+    currentCandle = { ...initialCandles[initialCandles.length - 1] };
+
+    drawTradeLines();
+
+    unsubscribeChartFeed = subscribeLivePrice(pair.symbol, (price) => {
+        document.getElementById('live-price-display').textContent = fmtPrice(pair.symbol, price);
+        const bucket = Math.floor(Date.now() / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS;
+        if (!currentCandle || currentCandle.time !== bucket) {
+            currentCandle = { time: bucket, open: price, high: price, low: price, close: price };
+        } else {
+            currentCandle.high = Math.max(currentCandle.high, price);
+            currentCandle.low = Math.min(currentCandle.low, price);
+            currentCandle.close = price;
+        }
+        lwSeries.update(currentCandle);
+        updateOpenPositionsPnlDisplay();
     });
 }
 
-window.placeOrder = (side) => {
-    document.getElementById('insufficient-modal-symbol').textContent = activeTradingSymbol.label;
-    document.getElementById('insufficient-modal').classList.remove('hidden');
+function drawTradeLines() {
+    if (!lwSeries) return;
+    lwPriceLines.forEach(line => lwSeries.removePriceLine(line));
+    lwPriceLines = [];
+
+    const relevant = userTrades.filter(t => t.symbol === activeTradingSymbol.symbol && (t.status === 'open' || t.status === 'pending'));
+    relevant.forEach(t => {
+        lwPriceLines.push(lwSeries.createPriceLine({
+            price: t.entryPrice, color: '#00f3ff', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+            axisLabelVisible: true, title: t.status === 'pending' ? 'Pending Entry' : 'Entry'
+        }));
+        if (t.sl) lwPriceLines.push(lwSeries.createPriceLine({
+            price: t.sl, color: '#ff3366', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true, title: 'SL'
+        }));
+        if (t.tp) lwPriceLines.push(lwSeries.createPriceLine({
+            price: t.tp, color: '#00ff66', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true, title: 'TP'
+        }));
+    });
+}
+
+window.initiateOrder = (side) => {
+    if (accountData.balance <= 0) {
+        document.getElementById('insufficient-modal-symbol').textContent = activeTradingSymbol.label;
+        document.getElementById('insufficient-modal').classList.remove('hidden');
+        return;
+    }
+
+    const lot = parseFloat(document.getElementById('order-lot').value) || 0.01;
+    const sl = parseFloat(document.getElementById('order-sl').value) || null;
+    const tp = parseFloat(document.getElementById('order-tp').value) || null;
+    const entryPrice = currentOrderType === 'limit'
+        ? (parseFloat(document.getElementById('order-entry').value) || getLivePrice(activeTradingSymbol.symbol))
+        : getLivePrice(activeTradingSymbol.symbol);
+
+    pendingOrderDraft = { side, lot, sl, tp, entryPrice, orderType: currentOrderType, symbol: activeTradingSymbol.symbol, label: activeTradingSymbol.label };
+
+    document.getElementById('order-modal-side').textContent = side.toUpperCase();
+    document.getElementById('order-modal-symbol').textContent = activeTradingSymbol.label;
+    document.getElementById('order-modal-type-label').textContent = currentOrderType === 'market' ? 'Market order \u2014 executes immediately' : 'Limit order \u2014 triggers when price is reached';
+    document.getElementById('order-modal-lot').textContent = lot;
+    document.getElementById('order-modal-entry').textContent = fmtPrice(activeTradingSymbol.symbol, entryPrice);
+    document.getElementById('order-modal-sl').textContent = sl ? fmtPrice(activeTradingSymbol.symbol, sl) : '\u2014';
+    document.getElementById('order-modal-tp').textContent = tp ? fmtPrice(activeTradingSymbol.symbol, tp) : '\u2014';
+    document.getElementById('order-modal').classList.remove('hidden');
 };
+
+let pendingOrderDraft = null;
+
+window.closeOrderModal = () => {
+    pendingOrderDraft = null;
+    document.getElementById('order-modal').classList.add('hidden');
+};
+
+window.confirmOrder = async () => {
+    if (!pendingOrderDraft) return;
+    const btn = document.getElementById('order-confirm-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Placing...';
+    btn.disabled = true;
+
+    const d = pendingOrderDraft;
+    try {
+        await addDoc(collection(db, 'trades'), {
+            userId: currentUserId,
+            symbol: d.symbol,
+            label: d.label,
+            side: d.side,
+            orderType: d.orderType,
+            lotSize: d.lot,
+            entryPrice: d.entryPrice,
+            sl: d.sl,
+            tp: d.tp,
+            status: d.orderType === 'market' ? 'open' : 'pending',
+            pnl: null,
+            closedPrice: null,
+            closeReason: null,
+            createdAt: serverTimestamp(),
+            closedAt: null
+        });
+        showToast(d.orderType === 'market' ? 'Position opened' : 'Pending order placed', 'success');
+        window.closeOrderModal();
+    } catch (err) {
+        showToast('Could not place order. Please try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
+window.closeTradeManually = async (id) => {
+    const trade = userTrades.find(t => t.id === id);
+    if (!trade) return;
+    const livePrice = getLivePrice(trade.symbol);
+    const pnl = pnlFor(trade, livePrice);
+    try {
+        await updateDoc(doc(db, 'trades', id), {
+            status: 'closed', closedPrice: livePrice, pnl, closeReason: 'manual', closedAt: serverTimestamp()
+        });
+        await updateDoc(doc(db, 'users', currentUserId), {
+            balance: increment(pnl), totalProfit: increment(pnl)
+        });
+        showToast('Position closed', 'success');
+    } catch (err) {
+        showToast('Could not close position. Please try again.', 'error');
+    }
+};
+
+window.cancelPendingTrade = async (id) => {
+    try {
+        await deleteDoc(doc(db, 'trades', id));
+        showToast('Pending order cancelled', 'info');
+    } catch (err) {
+        showToast('Could not cancel order. Please try again.', 'error');
+    }
+};
+
+function renderTradeTables() {
+    const openBody = document.getElementById('open-positions-body');
+    const pendingBody = document.getElementById('pending-orders-body');
+    const closedBody = document.getElementById('closed-trades-body');
+    if (!openBody) return;
+
+    const open = userTrades.filter(t => t.status === 'open');
+    const pending = userTrades.filter(t => t.status === 'pending');
+    const closed = userTrades.filter(t => t.status === 'closed');
+
+    openBody.innerHTML = open.length === 0 ? `<tr><td colspan="7" class="p-6 text-center text-gray-500">No running positions</td></tr>` : open.map(t => {
+        const live = getLivePrice(t.symbol);
+        const pnl = pnlFor(t, live);
+        return `<tr data-trade-id="${t.id}">
+            <td class="p-3 font-medium">${t.label}</td>
+            <td class="p-3 ${t.side === 'buy' ? 'text-neonGreen' : 'text-neonRed'} font-bold">${t.side.toUpperCase()}</td>
+            <td class="p-3 font-mono">${t.lotSize}</td>
+            <td class="p-3 font-mono">${fmtPrice(t.symbol, t.entryPrice)}</td>
+            <td class="p-3 font-mono text-xs">${t.sl ? fmtPrice(t.symbol, t.sl) : '\u2014'} / ${t.tp ? fmtPrice(t.symbol, t.tp) : '\u2014'}</td>
+            <td class="p-3 font-mono pnl-cell ${pnl >= 0 ? 'text-neonGreen' : 'text-neonRed'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
+            <td class="p-3"><button onclick="closeTradeManually('${t.id}')" class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg">Close</button></td>
+        </tr>`;
+    }).join('');
+
+    pendingBody.innerHTML = pending.length === 0 ? `<tr><td colspan="6" class="p-6 text-center text-gray-500">No pending orders</td></tr>` : pending.map(t => `
+        <tr>
+            <td class="p-3 font-medium">${t.label}</td>
+            <td class="p-3 ${t.side === 'buy' ? 'text-neonGreen' : 'text-neonRed'} font-bold">${t.side.toUpperCase()}</td>
+            <td class="p-3 font-mono">${t.lotSize}</td>
+            <td class="p-3 font-mono">${fmtPrice(t.symbol, t.entryPrice)}</td>
+            <td class="p-3 font-mono text-xs">${t.sl ? fmtPrice(t.symbol, t.sl) : '\u2014'} / ${t.tp ? fmtPrice(t.symbol, t.tp) : '\u2014'}</td>
+            <td class="p-3"><button onclick="cancelPendingTrade('${t.id}')" class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg">Cancel</button></td>
+        </tr>
+    `).join('');
+
+    closedBody.innerHTML = closed.length === 0 ? `<tr><td colspan="7" class="p-6 text-center text-gray-500">No closed trades yet</td></tr>` : closed.slice(0, 30).map(t => `
+        <tr>
+            <td class="p-3 font-medium">${t.label}</td>
+            <td class="p-3 ${t.side === 'buy' ? 'text-neonGreen' : 'text-neonRed'} font-bold">${t.side.toUpperCase()}</td>
+            <td class="p-3 font-mono">${t.lotSize}</td>
+            <td class="p-3 font-mono">${fmtPrice(t.symbol, t.entryPrice)}</td>
+            <td class="p-3 font-mono">${t.closedPrice ? fmtPrice(t.symbol, t.closedPrice) : '\u2014'}</td>
+            <td class="p-3 font-mono ${(t.pnl ?? 0) >= 0 ? 'text-neonGreen' : 'text-neonRed'}">${(t.pnl ?? 0) >= 0 ? '+' : ''}$${(t.pnl ?? 0).toFixed(2)}</td>
+            <td class="p-3 text-gray-400 text-xs capitalize">${t.closeReason || '\u2014'}</td>
+        </tr>
+    `).join('');
+
+    drawTradeLines();
+}
+
+function updateOpenPositionsPnlDisplay() {
+    const rows = document.querySelectorAll('#open-positions-body tr[data-trade-id]');
+    rows.forEach(row => {
+        const id = row.dataset.tradeId;
+        const trade = userTrades.find(t => t.id === id);
+        if (!trade) return;
+        const live = getLivePrice(trade.symbol);
+        const pnl = pnlFor(trade, live);
+        const cell = row.querySelector('.pnl-cell');
+        if (cell) {
+            cell.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+            cell.classList.toggle('text-neonGreen', pnl >= 0);
+            cell.classList.toggle('text-neonRed', pnl < 0);
+        }
+    });
+}
+
+function startTradeTickLoop() {
+    if (tickLoopStarted) return;
+    tickLoopStarted = true;
+    setInterval(async () => {
+        for (const trade of userTrades) {
+            if (trade.status === 'open') {
+                const live = getLivePrice(trade.symbol);
+                let closeReason = null;
+                if (trade.sl && ((trade.side === 'buy' && live <= trade.sl) || (trade.side === 'sell' && live >= trade.sl))) closeReason = 'sl';
+                if (trade.tp && ((trade.side === 'buy' && live >= trade.tp) || (trade.side === 'sell' && live <= trade.tp))) closeReason = 'tp';
+                if (closeReason) {
+                    const pnl = pnlFor(trade, live);
+                    try {
+                        await updateDoc(doc(db, 'trades', trade.id), {
+                            status: 'closed', closedPrice: live, pnl, closeReason, closedAt: serverTimestamp()
+                        });
+                        await updateDoc(doc(db, 'users', currentUserId), {
+                            balance: increment(pnl), totalProfit: increment(pnl)
+                        });
+                        showToast(`${trade.label} closed \u2014 ${closeReason.toUpperCase()} hit`, closeReason === 'tp' ? 'success' : 'info');
+                    } catch (e) { /* will retry next tick */ }
+                }
+            } else if (trade.status === 'pending') {
+                const live = getLivePrice(trade.symbol);
+                const triggered = (trade.side === 'buy' && live <= trade.entryPrice) || (trade.side === 'sell' && live >= trade.entryPrice);
+                if (triggered) {
+                    try {
+                        await updateDoc(doc(db, 'trades', trade.id), { status: 'open', entryPrice: live });
+                        showToast(`${trade.label} pending order triggered`, 'info');
+                    } catch (e) { /* will retry next tick */ }
+                }
+            }
+        }
+        const activeNavEl = document.querySelector('.nav-item[data-page].bg-neonBlue');
+        if (activeNavEl && activeNavEl.dataset.page === 'trading') {
+            renderTradeTables();
+        }
+    }, 2000);
+}
+
 
 const COPY_TRADERS = {
     'Highest ROI': [

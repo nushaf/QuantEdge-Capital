@@ -703,7 +703,13 @@ function selectTradingPair(pair) {
 
     activeTradingSymbol = pair;
     document.getElementById('active-symbol-label').textContent = pair.label;
-    document.getElementById('active-symbol-tag').textContent = isLiveSymbol(pair.symbol) ? 'LIVE' : pair.category;
+    const tagEl0 = document.getElementById('active-symbol-tag');
+    const isLive0 = isLiveSymbol(pair.symbol);
+    tagEl0.textContent = isLive0 ? 'LIVE' : pair.category;
+    tagEl0.classList.toggle('bg-neonGreen/10', isLive0);
+    tagEl0.classList.toggle('text-neonGreen', isLive0);
+    tagEl0.classList.toggle('bg-gray-800', !isLive0);
+    tagEl0.classList.toggle('text-gray-400', !isLive0);
     document.getElementById('order-symbol-label').textContent = pair.label;
     renderPairList(TRADING_PAIRS);
 
@@ -730,6 +736,12 @@ function selectTradingPair(pair) {
 
     unsubscribeChartFeed = subscribeLivePrice(pair.symbol, (price) => {
         document.getElementById('live-price-display').textContent = fmtPrice(pair.symbol, price);
+        const tagEl = document.getElementById('active-symbol-tag');
+        if (tagEl && isLiveSymbol(pair.symbol) && tagEl.textContent !== 'LIVE') {
+            tagEl.textContent = 'LIVE';
+            tagEl.classList.add('bg-neonGreen/10', 'text-neonGreen');
+            tagEl.classList.remove('bg-gray-800', 'text-gray-400');
+        }
         const bucket = Math.floor(Date.now() / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS;
         if (!currentCandle || currentCandle.time !== bucket) {
             currentCandle = { time: bucket, open: price, high: price, low: price, close: price };

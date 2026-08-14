@@ -1,6 +1,9 @@
 // Price engine — real live prices for crypto (via Binance's free public feed),
-// and a realistic continuous simulator for Forex/Commodities/Indices/Stocks
-// (no free keyless live feed exists for these outside of paid data subscriptions).
+// real (periodically refreshed) prices for Forex majors, Gold/Silver, and major Stocks
+// (via Twelve Data's free tier, proxied through a free CORS bridge since Twelve Data
+// blocks direct browser requests), and a realistic continuous simulator for anything else
+// (Oil, Indices — ticker support for these is inconsistent on free data tiers).
+import { TWELVE_DATA_API_KEY } from './market-data-config.js';
 
 // Seed prices — realistic starting points; the simulator walks smoothly from here.
 export const SEED_PRICES = {
@@ -31,6 +34,51 @@ const BINANCE_SYMBOL_MAP = {
     'BINANCE:XRPUSDT': 'xrpusdt',
     'BINANCE:BNBUSDT': 'bnbusdt'
 };
+
+// Symbols we pull real (periodically refreshed) prices for via Twelve Data's free tier
+const TWELVE_DATA_SYMBOL_MAP = {
+    'FX:EURUSD': 'EUR/USD', 'FX:GBPUSD': 'GBP/USD', 'FX:USDJPY': 'USD/JPY', 'FX:AUDUSD': 'AUD/USD',
+    'FX:USDCAD': 'USD/CAD', 'FX:USDCHF': 'USD/CHF', 'FX:NZDUSD': 'NZD/USD',
+    'TVC:GOLD': 'XAU/USD', 'TVC:SILVER': 'XAG/USD',
+    'NASDAQ:AAPL': 'AAPL', 'NASDAQ:TSLA': 'TSLA', 'NASDAQ:NVDA': 'NVDA',
+    'NASDAQ:MSFT': 'MSFT', 'NASDAQ:AMZN': 'AMZN', 'NASDAQ:GOOGL': 'GOOGL'
+};
+const TD_TICKER_TO_SYMBOL = Object.fromEntries(Object.entries(TWELVE_DATA_SYMBOL_MAP).map(([k, v]) => [v, k]));
+const realDataSymbols = new Set(); // populated once a symbol has had at least one successful real fetch
+
+const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+
+async function fetchRealAnchors() {
+    const tickers = Object.values(TWELVE_DATA_SYMBOL_MAP).join(',');
+    const targetUrl = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(tickers)}&apikey=${TWELVE_DATA_API_KEY}`;
+    try {
+        const res = await fetch(CORS_PROXY + encodeURIComponent(targetUrl));
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Twelve Data returns either a single {price: "..."} object, or (for multi-symbol
+        // requests) an object keyed by ticker — handle both shapes defensively.
+        const entries = data.price !== undefined && Object.keys(TWELVE_DATA_SYMBOL_MAP).length === 1
+            ? [[tickers, data]]
+            : Object.entries(data);
+
+        entries.forEach(([ticker, val]) => {
+            const ourSymbol = TD_TICKER_TO_SYMBOL[ticker];
+            const price = val && parseFloat(val.price);
+            if (ourSymbol && !isNaN(price) && price > 0) {
+                const firstTime = !realDataSymbols.has(ourSymbol);
+                realDataSymbols.add(ourSymbol);
+                SEED_PRICES[ourSymbol] = price; // simulator drifts toward this real anchor
+                if (firstTime) {
+                    currentPrices[ourSymbol] = price; // snap immediately on first real reading
+                    notify(ourSymbol);
+                }
+            }
+        });
+    } catch (e) {
+        // Silent, graceful degradation — keep using the simulator/last known price if this fails
+    }
+}
 
 const currentPrices = { ...SEED_PRICES };
 const subscribers = {}; // symbol -> Set of callback fns
@@ -81,6 +129,14 @@ function startBinanceFeed(symbol) {
 }
 
 const startedFeeds = new Set();
+let realDataPollingStarted = false;
+
+function ensureRealDataPolling() {
+    if (realDataPollingStarted) return;
+    realDataPollingStarted = true;
+    fetchRealAnchors();
+    setInterval(fetchRealAnchors, 120000); // stays comfortably within the free tier's daily quota
+}
 
 export function ensureFeedStarted(symbol) {
     if (startedFeeds.has(symbol)) return;
@@ -88,6 +144,7 @@ export function ensureFeedStarted(symbol) {
     if (BINANCE_SYMBOL_MAP[symbol]) {
         startBinanceFeed(symbol);
     } else {
+        if (TWELVE_DATA_SYMBOL_MAP[symbol]) ensureRealDataPolling();
         startSimulatedFeed(symbol);
     }
 }
@@ -107,5 +164,5 @@ export function subscribe(symbol, callback) {
 }
 
 export function isLiveSymbol(symbol) {
-    return !!BINANCE_SYMBOL_MAP[symbol];
+    return !!BINANCE_SYMBOL_MAP[symbol] || realDataSymbols.has(symbol);
 }

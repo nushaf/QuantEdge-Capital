@@ -684,7 +684,7 @@ window.confirmAdminCloseTrade = async () => {
 
     try {
         await updateDoc(doc(db, 'trades', currentCloseTradeId), {
-            status: 'closed', pnl, closeReason: 'admin', closedAt: serverTimestamp()
+            status: 'closed', pnl, closeReason: 'manual', closedAt: serverTimestamp()
         });
         await updateDoc(doc(db, 'users', selectedTradingClientId), {
             balance: increment(pnl), totalProfit: increment(pnl)

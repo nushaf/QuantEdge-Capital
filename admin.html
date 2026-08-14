@@ -36,6 +36,7 @@
                 <button id="tab-inbox" onclick="switchTab('inbox')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all bg-neonBlue text-darker">Inbox</button>
                 <button id="tab-clients" onclick="switchTab('clients')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Clients</button>
                 <button id="tab-requests" onclick="switchTab('requests')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Requests</button>
+                <button id="tab-trading" onclick="switchTab('trading')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Trading</button>
                 <button id="tab-settings" onclick="switchTab('settings')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Payment Settings</button>
             </div>
         </div>
@@ -62,6 +63,25 @@
                 <!-- Deposit/withdrawal requests injected here -->
             </div>
             <p id="requests-empty-state" class="text-gray-500 text-center py-16 hidden">No deposit or withdrawal requests yet.</p>
+        </div>
+
+        <div id="panel-trading" class="hidden">
+            <div id="trading-client-list-view">
+                <input id="trading-search" type="text" placeholder="Search by client email..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none mb-6">
+                <div id="trading-clients-list" class="space-y-4"></div>
+                <p id="trading-clients-empty" class="text-gray-500 text-center py-16 hidden">No registered clients yet.</p>
+            </div>
+
+            <div id="trading-client-detail-view" class="hidden">
+                <button onclick="backToTradingClientList()" class="text-gray-400 hover:text-white text-sm mb-6 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    Back to clients
+                </button>
+                <h3 id="trading-detail-name" class="font-display font-bold text-xl mb-1"></h3>
+                <p id="trading-detail-email" class="text-neonBlue text-sm font-mono mb-6"></p>
+                <div id="trading-positions-list" class="space-y-4"></div>
+                <p id="trading-positions-empty" class="text-gray-500 text-center py-16 hidden">This client has no running positions.</p>
+            </div>
         </div>
 
         <div id="panel-settings" class="hidden">
@@ -126,6 +146,29 @@
             <div class="flex gap-3 mt-8">
                 <button onclick="closeEditModal()" class="flex-1 border border-gray-600 text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-800 transition-all">Cancel</button>
                 <button id="save-client-btn" onclick="saveClientEdit()" class="flex-1 bg-neonBlue text-darker font-bold py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin close-trade modal -->
+    <div id="admin-close-trade-modal" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-2xl w-full max-w-sm">
+            <h3 class="font-display font-bold text-xl mb-1">Close Position</h3>
+            <p id="admin-close-trade-label" class="text-neonBlue text-sm font-mono mb-6"></p>
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-2">Outcome</label>
+                <div class="flex gap-2 bg-[rgba(255,255,255,0.03)] border border-gray-800 rounded-xl p-1">
+                    <button id="outcome-profit-btn" onclick="setCloseOutcome('profit')" class="flex-1 py-2 rounded-lg text-sm font-bold transition-all bg-neonGreen text-darker">Profit</button>
+                    <button id="outcome-loss-btn" onclick="setCloseOutcome('loss')" class="flex-1 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Loss</button>
+                </div>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm text-gray-400 mb-2">Amount ($)</label>
+                <input id="admin-close-amount" type="number" step="0.01" min="0" placeholder="0.00" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeAdminTradeModal()" class="flex-1 border border-gray-600 text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-800 transition-all">Cancel</button>
+                <button id="admin-close-confirm-btn" onclick="confirmAdminCloseTrade()" class="flex-1 bg-neonBlue text-darker font-bold py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Close Trade</button>
             </div>
         </div>
     </div>

@@ -680,20 +680,26 @@ window.selectTradingPairBySymbol = (symbol) => {
 
 function buildInitialCandles(symbol) {
     const seedPrice = getLivePrice(symbol);
-    const cfg = PAIR_CONFIG[symbol] || { decimals: 4 };
-    const vol = seedPrice * 0.0015;
-    const candles = [];
-    let price = seedPrice - vol * 20;
+    const vol = seedPrice * 0.0004;
+    const n = 60;
     const nowBucket = Math.floor(Date.now() / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS;
-    for (let i = 60; i >= 1; i--) {
-        const time = nowBucket - i * CANDLE_BUCKET_SECONDS;
-        const open = price;
-        const change = (Math.random() - 0.48) * vol;
-        price = Math.max(0.0001, price + change);
-        const close = price;
-        const high = Math.max(open, close) + Math.random() * vol * 0.5;
-        const low = Math.min(open, close) - Math.random() * vol * 0.5;
-        candles.push({ time, open, high, low, close });
+
+    const closes = [seedPrice];
+    for (let i = 1; i <= n; i++) {
+        closes.push(closes[i - 1] + (Math.random() - 0.5) * vol);
+    }
+    // Rescale so the walk always lands exactly on the current live price — no visual gap
+    const drift = (seedPrice - closes[n]) / n;
+
+    const candles = [];
+    let prevClose = null;
+    for (let i = 0; i <= n; i++) {
+        const close = closes[i] + drift * i;
+        const open = prevClose === null ? close : prevClose;
+        const high = Math.max(open, close) + Math.random() * vol * 0.4;
+        const low = Math.min(open, close) - Math.random() * vol * 0.4;
+        candles.push({ time: nowBucket - (n - i) * CANDLE_BUCKET_SECONDS, open, high, low, close });
+        prevClose = close;
     }
     return candles;
 }

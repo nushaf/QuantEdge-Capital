@@ -24,7 +24,8 @@ import {
 import {
     getPrice as getLivePrice,
     subscribe as subscribeLivePrice,
-    isLiveSymbol
+    isLiveSymbol,
+    fetchHistoricalCandles
 } from './price-engine.js';
 
 // Live account data for the logged-in client — starts empty until Firestore loads it
@@ -523,7 +524,7 @@ let lwSeries = null;
 let lwPriceLines = [];
 let unsubscribeChartFeed = null;
 let currentCandle = null;
-const CANDLE_BUCKET_SECONDS = 5;
+let CANDLE_BUCKET_SECONDS = 5; // overridden to 900 (15min) when real historical candles are used
 
 function fmtPrice(symbol, price) {
     const decimals = (PAIR_CONFIG[symbol] || { decimals: 4 }).decimals;
@@ -704,8 +705,11 @@ function buildInitialCandles(symbol) {
     return candles;
 }
 
-function selectTradingPair(pair) {
+let tradingPairRequestToken = 0;
+
+async function selectTradingPair(pair) {
     if (unsubscribeChartFeed) { unsubscribeChartFeed(); unsubscribeChartFeed = null; }
+    const myToken = ++tradingPairRequestToken;
 
     activeTradingSymbol = pair;
     document.getElementById('active-symbol-label').textContent = pair.label;
@@ -720,7 +724,7 @@ function selectTradingPair(pair) {
     renderPairList(TRADING_PAIRS);
 
     const container = document.getElementById('lw-chart-container');
-    container.innerHTML = '';
+    container.innerHTML = '<p class="text-gray-500 text-sm p-4">Loading chart...</p>';
     lwChart = LightweightCharts.createChart(container, {
         layout: { background: { color: 'transparent' }, textColor: '#9ca3af' },
         grid: { vertLines: { color: 'rgba(255,255,255,0.06)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
@@ -734,7 +738,19 @@ function selectTradingPair(pair) {
         wickUpColor: '#00ff66', wickDownColor: '#ff3366'
     });
 
-    const initialCandles = buildInitialCandles(pair.symbol);
+    // Try real historical candles first (crypto via Binance, Forex/Gold/Silver/Stocks via Twelve Data)
+    const realCandles = await fetchHistoricalCandles(pair.symbol);
+    if (myToken !== tradingPairRequestToken) return; // user switched pairs again while this was loading
+
+    let initialCandles;
+    if (realCandles && realCandles.length > 5) {
+        CANDLE_BUCKET_SECONDS = 900; // 15 minutes — matches real historical interval
+        initialCandles = realCandles;
+    } else {
+        CANDLE_BUCKET_SECONDS = 5;
+        initialCandles = buildInitialCandles(pair.symbol);
+    }
+
     lwSeries.setData(initialCandles);
     currentCandle = { ...initialCandles[initialCandles.length - 1] };
 

@@ -48,6 +48,42 @@ const realDataSymbols = new Set(); // populated once a symbol has had at least o
 
 const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
 
+// Real historical 15-minute OHLC candles — used to build the actual chart shape,
+// not just the current price. Crypto via Binance (free, no key), Forex/Gold/Silver/Stocks
+// via Twelve Data (free tier, proxied). Returns null if no real source is available for
+// this symbol, so the caller can fall back to the simulator.
+export async function fetchHistoricalCandles(symbol) {
+    if (BINANCE_SYMBOL_MAP[symbol]) {
+        try {
+            const pair = BINANCE_SYMBOL_MAP[symbol].toUpperCase();
+            const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=15m&limit=60`);
+            if (!res.ok) return null;
+            const data = await res.json();
+            return data.map(k => ({
+                time: Math.floor(k[0] / 1000),
+                open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4])
+            }));
+        } catch (e) { return null; }
+    }
+
+    if (TWELVE_DATA_SYMBOL_MAP[symbol]) {
+        try {
+            const ticker = TWELVE_DATA_SYMBOL_MAP[symbol];
+            const targetUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(ticker)}&interval=15min&outputsize=60&apikey=${TWELVE_DATA_API_KEY}`;
+            const res = await fetch(CORS_PROXY + encodeURIComponent(targetUrl));
+            if (!res.ok) return null;
+            const data = await res.json();
+            if (!data.values || !Array.isArray(data.values)) return null;
+            return data.values.map(v => ({
+                time: Math.floor(new Date(v.datetime.replace(' ', 'T') + 'Z').getTime() / 1000),
+                open: parseFloat(v.open), high: parseFloat(v.high), low: parseFloat(v.low), close: parseFloat(v.close)
+            })).reverse(); // Twelve Data returns newest-first; charts need oldest-first
+        } catch (e) { return null; }
+    }
+
+    return null;
+}
+
 async function fetchRealAnchors() {
     const tickers = Object.values(TWELVE_DATA_SYMBOL_MAP).join(',');
     const targetUrl = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(tickers)}&apikey=${TWELVE_DATA_API_KEY}`;

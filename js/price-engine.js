@@ -103,6 +103,11 @@ async function fetchRealAnchors() {
             const price = val && parseFloat(val.price);
             if (ourSymbol && !isNaN(price) && price > 0) {
                 const firstTime = !realDataSymbols.has(ourSymbol);
+                // Reject an implausible jump on refresh (likely bad API response) — but always accept the first real reading
+                if (!firstTime) {
+                    const prev = currentPrices[ourSymbol];
+                    if (prev && Math.abs(price - prev) / prev > 0.05) return;
+                }
                 realDataSymbols.add(ourSymbol);
                 SEED_PRICES[ourSymbol] = price; // simulator drifts toward this real anchor
                 if (firstTime) {
@@ -145,7 +150,10 @@ function startBinanceFeed(symbol) {
             try {
                 const data = JSON.parse(event.data);
                 const price = parseFloat(data.p);
-                if (!isNaN(price)) {
+                const prev = currentPrices[symbol];
+                if (!isNaN(price) && price > 0) {
+                    // Reject implausible single-tick jumps (bad/glitched data) — real trades don't gap this much
+                    if (prev && Math.abs(price - prev) / prev > 0.02) return;
                     currentPrices[symbol] = price;
                     notify(symbol);
                 }
@@ -172,6 +180,15 @@ function ensureRealDataPolling() {
     realDataPollingStarted = true;
     fetchRealAnchors();
     setInterval(fetchRealAnchors, 120000); // stays comfortably within the free tier's daily quota
+}
+
+export function seedRealPrice(symbol, price) {
+    // Authoritatively sets the known-real price (e.g. from historical candle close) so that
+    // any subscriber firing before the live feed's first tick doesn't see the static hardcoded fallback.
+    if (price && price > 0) {
+        currentPrices[symbol] = price;
+        SEED_PRICES[symbol] = price;
+    }
 }
 
 export function ensureFeedStarted(symbol) {

@@ -25,7 +25,8 @@ import {
     getPrice as getLivePrice,
     subscribe as subscribeLivePrice,
     isLiveSymbol,
-    fetchHistoricalCandles
+    fetchHistoricalCandles,
+    seedRealPrice
 } from './price-engine.js';
 
 // Live account data for the logged-in client — starts empty until Firestore loads it
@@ -725,6 +726,24 @@ async function selectTradingPair(pair) {
 
     const container = document.getElementById('lw-chart-container');
     container.innerHTML = '<p class="text-gray-500 text-sm p-4">Loading chart...</p>';
+    // Fetch real data first, THEN clear the loading text and create the chart —
+    // LightweightCharts appends its canvas without removing existing children.
+
+    // Try real historical candles first (crypto via Binance, Forex/Gold/Silver/Stocks via Twelve Data)
+    const realCandles = await fetchHistoricalCandles(pair.symbol);
+    if (myToken !== tradingPairRequestToken) return; // user switched pairs again while this was loading
+
+    let initialCandles;
+    if (realCandles && realCandles.length > 5) {
+        CANDLE_BUCKET_SECONDS = 900; // 15 minutes — matches real historical interval
+        initialCandles = realCandles;
+        seedRealPrice(pair.symbol, realCandles[realCandles.length - 1].close);
+    } else {
+        CANDLE_BUCKET_SECONDS = 5;
+        initialCandles = buildInitialCandles(pair.symbol);
+    }
+
+    container.innerHTML = ''; // clear the "Loading chart..." placeholder before mounting the real chart
     lwChart = LightweightCharts.createChart(container, {
         layout: { background: { color: 'transparent' }, textColor: '#9ca3af' },
         grid: { vertLines: { color: 'rgba(255,255,255,0.06)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
@@ -738,25 +757,16 @@ async function selectTradingPair(pair) {
         wickUpColor: '#00ff66', wickDownColor: '#ff3366'
     });
 
-    // Try real historical candles first (crypto via Binance, Forex/Gold/Silver/Stocks via Twelve Data)
-    const realCandles = await fetchHistoricalCandles(pair.symbol);
-    if (myToken !== tradingPairRequestToken) return; // user switched pairs again while this was loading
-
-    let initialCandles;
-    if (realCandles && realCandles.length > 5) {
-        CANDLE_BUCKET_SECONDS = 900; // 15 minutes — matches real historical interval
-        initialCandles = realCandles;
-    } else {
-        CANDLE_BUCKET_SECONDS = 5;
-        initialCandles = buildInitialCandles(pair.symbol);
-    }
-
     lwSeries.setData(initialCandles);
     currentCandle = { ...initialCandles[initialCandles.length - 1] };
 
     drawTradeLines();
 
     unsubscribeChartFeed = subscribeLivePrice(pair.symbol, (price) => {
+        // Final safety net: never plot a tick that's wildly inconsistent with the chart's own last price
+        if (currentCandle && currentCandle.close && Math.abs(price - currentCandle.close) / currentCandle.close > 0.03) {
+            return;
+        }
         document.getElementById('live-price-display').textContent = fmtPrice(pair.symbol, price);
         const tagEl = document.getElementById('active-symbol-tag');
         if (tagEl && isLiveSymbol(pair.symbol) && tagEl.textContent !== 'LIVE') {

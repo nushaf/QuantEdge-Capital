@@ -26,7 +26,8 @@ import {
     subscribe as subscribeLivePrice,
     isLiveSymbol,
     fetchHistoricalCandles,
-    seedRealPrice
+    seedRealPrice,
+    isMarketOpen
 } from './price-engine.js';
 
 // Live account data for the logged-in client — starts empty until Firestore loads it
@@ -716,11 +717,14 @@ async function selectTradingPair(pair) {
     document.getElementById('active-symbol-label').textContent = pair.label;
     const tagEl0 = document.getElementById('active-symbol-tag');
     const isLive0 = isLiveSymbol(pair.symbol);
-    tagEl0.textContent = isLive0 ? 'LIVE' : pair.category;
-    tagEl0.classList.toggle('bg-neonGreen/10', isLive0);
-    tagEl0.classList.toggle('text-neonGreen', isLive0);
-    tagEl0.classList.toggle('bg-gray-800', !isLive0);
-    tagEl0.classList.toggle('text-gray-400', !isLive0);
+    const marketOpen0 = isMarketOpen(pair.symbol);
+    if (isLive0 && !marketOpen0) {
+        tagEl0.textContent = 'Market Closed';
+        tagEl0.className = 'ml-2 text-xs px-2 py-0.5 rounded-full bg-neonGold/10 text-neonGold';
+    } else {
+        tagEl0.textContent = isLive0 ? 'LIVE' : pair.category;
+        tagEl0.className = `ml-2 text-xs px-2 py-0.5 rounded-full ${isLive0 ? 'bg-neonGreen/10 text-neonGreen' : 'bg-gray-800 text-gray-400'}`;
+    }
     document.getElementById('order-symbol-label').textContent = pair.label;
     renderPairList(TRADING_PAIRS);
 

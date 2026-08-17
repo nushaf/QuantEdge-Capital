@@ -150,9 +150,35 @@ function notify(symbol) {
     (subscribers[symbol] || new Set()).forEach(cb => cb(price));
 }
 
+// Instruments that trade like Forex (~24/5, closed Fri 21:00 UTC \u2192 Sun 21:00 UTC)
+const FOREX_LIKE = new Set(['FX:EURUSD', 'FX:GBPUSD', 'FX:USDJPY', 'FX:AUDUSD', 'FX:USDCAD', 'FX:USDCHF', 'FX:NZDUSD', 'TVC:GOLD', 'TVC:SILVER']);
+// Individual stocks — approx NYSE/NASDAQ hours, Mon\u2013Fri 13:30\u201320:00 UTC (DST/holidays not modeled)
+const STOCK_LIKE = new Set(['NASDAQ:AAPL', 'NASDAQ:TSLA', 'NASDAQ:NVDA', 'NASDAQ:MSFT', 'NASDAQ:AMZN', 'NASDAQ:GOOGL']);
+
+export function isMarketOpen(symbol) {
+    if (COINBASE_SYMBOL_MAP[symbol] || BINANCE_SYMBOL_MAP[symbol]) return true; // crypto: 24/7
+
+    const now = new Date();
+    const day = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
+    const totalMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+
+    if (FOREX_LIKE.has(symbol)) {
+        if (day === 6) return false;
+        if (day === 5 && totalMin >= 21 * 60) return false;
+        if (day === 0 && totalMin < 21 * 60) return false;
+        return true;
+    }
+    if (STOCK_LIKE.has(symbol)) {
+        if (day === 0 || day === 6) return false;
+        return totalMin >= 13 * 60 + 30 && totalMin < 20 * 60;
+    }
+    return true;
+}
+
 function startSimulatedFeed(symbol) {
     const vol = VOLATILITY[symbol] || (currentPrices[symbol] * 0.0005);
     setInterval(() => {
+        if (!isMarketOpen(symbol)) return; // frozen while the real market is closed — matches real platforms
         // gentle mean-reverting random walk so prices don't drift wildly over long sessions
         const drift = (SEED_PRICES[symbol] - currentPrices[symbol]) * 0.002;
         const noise = (Math.random() - 0.5) * vol * 0.6;

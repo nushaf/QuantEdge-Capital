@@ -1,4 +1,5 @@
-// Price engine — real live prices for crypto (via Binance's free public feed),
+// Price engine — real live prices for crypto (BTC/ETH/SOL/XRP via Coinbase's free public feed,
+// matching the exchange most comparison charts show; BNB via Binance since Coinbase doesn't list it),
 // real (periodically refreshed) prices for Forex majors, Gold/Silver, and major Stocks
 // (via Twelve Data's free tier, proxied through a free CORS bridge since Twelve Data
 // blocks direct browser requests), and a realistic continuous simulator for anything else
@@ -28,11 +29,15 @@ const VOLATILITY = {
 };
 
 const BINANCE_SYMBOL_MAP = {
-    'BINANCE:BTCUSDT': 'btcusdt',
-    'BINANCE:ETHUSDT': 'ethusdt',
-    'BINANCE:SOLUSDT': 'solusdt',
-    'BINANCE:XRPUSDT': 'xrpusdt',
-    'BINANCE:BNBUSDT': 'bnbusdt'
+    'BINANCE:BNBUSDT': 'bnbusdt' // Coinbase doesn't list BNB, so this one stays on Binance
+};
+
+// Coinbase — matches the exchange most price-comparison charts (like TradingView's default) show
+const COINBASE_SYMBOL_MAP = {
+    'BINANCE:BTCUSDT': 'BTC-USD',
+    'BINANCE:ETHUSDT': 'ETH-USD',
+    'BINANCE:SOLUSDT': 'SOL-USD',
+    'BINANCE:XRPUSDT': 'XRP-USD'
 };
 
 // Symbols we pull real (periodically refreshed) prices for via Twelve Data's free tier
@@ -53,6 +58,21 @@ const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
 // via Twelve Data (free tier, proxied). Returns null if no real source is available for
 // this symbol, so the caller can fall back to the simulator.
 export async function fetchHistoricalCandles(symbol) {
+    if (COINBASE_SYMBOL_MAP[symbol]) {
+        try {
+            const product = COINBASE_SYMBOL_MAP[symbol];
+            const res = await fetch(`https://api.exchange.coinbase.com/products/${product}/candles?granularity=900`);
+            if (!res.ok) return null;
+            const data = await res.json();
+            if (!Array.isArray(data) || data.length === 0) return null;
+            // Coinbase returns [time, low, high, open, close, volume], newest-first
+            return data
+                .map(c => ({ time: c[0], open: c[3], high: c[2], low: c[1], close: c[4] }))
+                .sort((a, b) => a.time - b.time)
+                .slice(-60);
+        } catch (e) { return null; }
+    }
+
     if (BINANCE_SYMBOL_MAP[symbol]) {
         try {
             const pair = BINANCE_SYMBOL_MAP[symbol].toUpperCase();
@@ -141,6 +161,39 @@ function startSimulatedFeed(symbol) {
     }, 350 + Math.random() * 400);
 }
 
+function startCoinbaseFeed(symbol) {
+    const product = COINBASE_SYMBOL_MAP[symbol];
+    if (!product) return;
+    try {
+        const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ type: 'subscribe', product_ids: [product], channels: ['ticker'] }));
+        };
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type !== 'ticker' || !data.price) return;
+                const price = parseFloat(data.price);
+                const prev = currentPrices[symbol];
+                if (!isNaN(price) && price > 0) {
+                    if (prev && Math.abs(price - prev) / prev > 0.02) return;
+                    currentPrices[symbol] = price;
+                    notify(symbol);
+                }
+            } catch (e) { /* ignore malformed tick */ }
+        };
+        ws.onerror = () => {
+            if (!wsConnections[symbol + '_fallback']) {
+                wsConnections[symbol + '_fallback'] = true;
+                startSimulatedFeed(symbol);
+            }
+        };
+        wsConnections[symbol] = ws;
+    } catch (e) {
+        startSimulatedFeed(symbol);
+    }
+}
+
 function startBinanceFeed(symbol) {
     const pair = BINANCE_SYMBOL_MAP[symbol];
     if (!pair) return;
@@ -194,7 +247,9 @@ export function seedRealPrice(symbol, price) {
 export function ensureFeedStarted(symbol) {
     if (startedFeeds.has(symbol)) return;
     startedFeeds.add(symbol);
-    if (BINANCE_SYMBOL_MAP[symbol]) {
+    if (COINBASE_SYMBOL_MAP[symbol]) {
+        startCoinbaseFeed(symbol);
+    } else if (BINANCE_SYMBOL_MAP[symbol]) {
         startBinanceFeed(symbol);
     } else {
         if (TWELVE_DATA_SYMBOL_MAP[symbol]) ensureRealDataPolling();
@@ -217,5 +272,5 @@ export function subscribe(symbol, callback) {
 }
 
 export function isLiveSymbol(symbol) {
-    return !!BINANCE_SYMBOL_MAP[symbol] || realDataSymbols.has(symbol);
+    return !!COINBASE_SYMBOL_MAP[symbol] || !!BINANCE_SYMBOL_MAP[symbol] || realDataSymbols.has(symbol);
 }

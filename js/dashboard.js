@@ -25,8 +25,6 @@ import {
     getPrice as getLivePrice,
     subscribe as subscribeLivePrice,
     isLiveSymbol,
-    fetchHistoricalCandles,
-    seedRealPrice,
     isMarketOpen
 } from './price-engine.js';
 
@@ -521,12 +519,7 @@ const TRADING_PAIRS = [
     { symbol: 'NASDAQ:GOOGL', label: 'Google', category: 'Stocks' }
 ];
 let activeTradingSymbol = TRADING_PAIRS[0];
-let lwChart = null;
-let lwSeries = null;
-let lwPriceLines = [];
 let unsubscribeChartFeed = null;
-let currentCandle = null;
-let CANDLE_BUCKET_SECONDS = 5; // overridden to 900 (15min) when real historical candles are used
 
 function fmtPrice(symbol, price) {
     const decimals = (PAIR_CONFIG[symbol] || { decimals: 4 }).decimals;
@@ -557,7 +550,7 @@ function renderTrading() {
                 <span id="live-price-display" class="font-mono text-xl font-bold text-neonBlue"></span>
             </div>
         </div>
-        <div id="lw-chart-container" class="h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden bg-white"></div>
+        <div id="tv-trading-chart-container" class="h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden bg-white"></div>
     </div>
 
     <div class="glass-panel p-6 rounded-2xl mb-6">
@@ -681,37 +674,8 @@ window.selectTradingPairBySymbol = (symbol) => {
     if (pair) selectTradingPair(pair);
 };
 
-function buildInitialCandles(symbol) {
-    const seedPrice = getLivePrice(symbol);
-    const vol = seedPrice * 0.0004;
-    const n = 60;
-    const nowBucket = Math.floor(Date.now() / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS;
-
-    const closes = [seedPrice];
-    for (let i = 1; i <= n; i++) {
-        closes.push(closes[i - 1] + (Math.random() - 0.5) * vol);
-    }
-    // Rescale so the walk always lands exactly on the current live price — no visual gap
-    const drift = (seedPrice - closes[n]) / n;
-
-    const candles = [];
-    let prevClose = null;
-    for (let i = 0; i <= n; i++) {
-        const close = closes[i] + drift * i;
-        const open = prevClose === null ? close : prevClose;
-        const high = Math.max(open, close) + Math.random() * vol * 0.4;
-        const low = Math.min(open, close) - Math.random() * vol * 0.4;
-        candles.push({ time: nowBucket - (n - i) * CANDLE_BUCKET_SECONDS, open, high, low, close });
-        prevClose = close;
-    }
-    return candles;
-}
-
-let tradingPairRequestToken = 0;
-
-async function selectTradingPair(pair) {
+function selectTradingPair(pair) {
     if (unsubscribeChartFeed) { unsubscribeChartFeed(); unsubscribeChartFeed = null; }
-    const myToken = ++tradingPairRequestToken;
 
     activeTradingSymbol = pair;
     document.getElementById('active-symbol-label').textContent = pair.label;
@@ -728,98 +692,31 @@ async function selectTradingPair(pair) {
     document.getElementById('order-symbol-label').textContent = pair.label;
     renderPairList(TRADING_PAIRS);
 
-    const container = document.getElementById('lw-chart-container');
-    container.innerHTML = '<p class="text-gray-500 text-sm p-4">Loading chart...</p>';
-    // Fetch real data first, THEN clear the loading text and create the chart —
-    // LightweightCharts appends its canvas without removing existing children.
-
-    // Try real historical candles first (crypto via Binance, Forex/Gold/Silver/Stocks via Twelve Data)
-    const realCandles = await fetchHistoricalCandles(pair.symbol);
-    if (myToken !== tradingPairRequestToken) return; // user switched pairs again while this was loading
-
-    let initialCandles;
-    if (realCandles && realCandles.length > 5) {
-        CANDLE_BUCKET_SECONDS = 900; // 15 minutes — matches real historical interval
-        initialCandles = realCandles;
-        seedRealPrice(pair.symbol, realCandles[realCandles.length - 1].close);
-    } else {
-        CANDLE_BUCKET_SECONDS = 5;
-        initialCandles = buildInitialCandles(pair.symbol);
-    }
-
-    container.innerHTML = ''; // clear the "Loading chart..." placeholder before mounting the real chart
-    lwChart = LightweightCharts.createChart(container, {
-        layout: { background: { color: '#ffffff' }, textColor: '#131722' },
-        grid: { vertLines: { color: '#eef0f3' }, horzLines: { color: '#eef0f3' } },
-        timeScale: { timeVisible: true, secondsVisible: true, borderColor: '#d1d4dc' },
-        rightPriceScale: { borderColor: '#d1d4dc' },
-        autoSize: true
+    // Real TradingView chart \u2014 exact match to tradingview.com, no custom overlays drawn on it
+    injectTVWidget('tv-trading-chart-container', 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js', {
+        autosize: true,
+        symbol: pair.symbol,
+        interval: '15',
+        timezone: 'Etc/UTC',
+        theme: 'light',
+        style: '1',
+        locale: 'en',
+        enable_publishing: false,
+        hide_top_toolbar: false,
+        hide_legend: false,
+        save_image: false,
+        calendar: false,
+        support_host: 'https://www.tradingview.com'
     });
-    lwSeries = lwChart.addCandlestickSeries({
-        upColor: '#26a69a', downColor: '#ef5350',
-        borderUpColor: '#26a69a', borderDownColor: '#ef5350',
-        wickUpColor: '#26a69a', wickDownColor: '#ef5350'
-    });
-
-    lwSeries.setData(initialCandles);
-    currentCandle = { ...initialCandles[initialCandles.length - 1] };
-
-    drawTradeLines();
 
     unsubscribeChartFeed = subscribeLivePrice(pair.symbol, (price) => {
-        // Final safety net: never plot a tick that's wildly inconsistent with the chart's own last price
-        if (currentCandle && currentCandle.close && Math.abs(price - currentCandle.close) / currentCandle.close > 0.03) {
-            return;
-        }
         document.getElementById('live-price-display').textContent = fmtPrice(pair.symbol, price);
         const tagEl = document.getElementById('active-symbol-tag');
-        if (tagEl && isLiveSymbol(pair.symbol) && tagEl.textContent !== 'LIVE') {
+        if (tagEl && isLiveSymbol(pair.symbol) && isMarketOpen(pair.symbol) && tagEl.textContent !== 'LIVE') {
             tagEl.textContent = 'LIVE';
-            tagEl.classList.add('bg-neonGreen/10', 'text-neonGreen');
-            tagEl.classList.remove('bg-gray-800', 'text-gray-400');
+            tagEl.className = 'ml-2 text-xs px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen';
         }
-        const bucket = Math.floor(Date.now() / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS;
-        if (!currentCandle || currentCandle.time !== bucket) {
-            currentCandle = { time: bucket, open: price, high: price, low: price, close: price };
-        } else {
-            currentCandle.high = Math.max(currentCandle.high, price);
-            currentCandle.low = Math.min(currentCandle.low, price);
-            currentCandle.close = price;
-        }
-        lwSeries.update(currentCandle);
         updateOpenPositionsPnlDisplay();
-    });
-}
-
-function drawTradeLines() {
-    if (!lwSeries) return;
-    lwPriceLines.forEach(line => lwSeries.removePriceLine(line));
-    lwPriceLines = [];
-
-    const relevant = userTrades.filter(t => t.symbol === activeTradingSymbol.symbol && (t.status === 'open' || t.status === 'pending'));
-
-    const markers = relevant.filter(t => t.status === 'open').map(t => ({
-        time: Math.floor((t.createdAt?.toMillis?.() ?? Date.now()) / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS,
-        position: t.side === 'buy' ? 'belowBar' : 'aboveBar',
-        color: t.side === 'buy' ? '#089981' : '#f23645',
-        shape: t.side === 'buy' ? 'arrowUp' : 'arrowDown',
-        text: `${t.side.toUpperCase()} ${t.lotSize}`
-    }));
-    lwSeries.setMarkers(markers);
-
-    relevant.forEach(t => {
-        lwPriceLines.push(lwSeries.createPriceLine({
-            price: t.entryPrice, color: '#2962ff', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
-            axisLabelVisible: true, title: t.status === 'pending' ? 'Pending Entry' : `${t.side.toUpperCase()} Entry`
-        }));
-        if (t.sl) lwPriceLines.push(lwSeries.createPriceLine({
-            price: t.sl, color: '#f23645', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
-            axisLabelVisible: true, title: 'Stop Loss'
-        }));
-        if (t.tp) lwPriceLines.push(lwSeries.createPriceLine({
-            price: t.tp, color: '#089981', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
-            axisLabelVisible: true, title: 'Take Profit'
-        }));
     });
 }
 
@@ -965,8 +862,6 @@ function renderTradeTables() {
             <td class="p-3 text-gray-400 text-xs capitalize">${t.closeReason || '\u2014'}</td>
         </tr>
     `).join('');
-
-    drawTradeLines();
 }
 
 function updateOpenPositionsPnlDisplay() {

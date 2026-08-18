@@ -557,7 +557,7 @@ function renderTrading() {
                 <span id="live-price-display" class="font-mono text-xl font-bold text-neonBlue"></span>
             </div>
         </div>
-        <div id="lw-chart-container" class="h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden bg-black/30"></div>
+        <div id="lw-chart-container" class="h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden bg-white"></div>
     </div>
 
     <div class="glass-panel p-6 rounded-2xl mb-6">
@@ -749,16 +749,16 @@ async function selectTradingPair(pair) {
 
     container.innerHTML = ''; // clear the "Loading chart..." placeholder before mounting the real chart
     lwChart = LightweightCharts.createChart(container, {
-        layout: { background: { color: 'transparent' }, textColor: '#9ca3af' },
-        grid: { vertLines: { color: 'rgba(255,255,255,0.06)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
-        timeScale: { timeVisible: true, secondsVisible: true, borderColor: 'rgba(255,255,255,0.1)' },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+        layout: { background: { color: '#ffffff' }, textColor: '#131722' },
+        grid: { vertLines: { color: '#eef0f3' }, horzLines: { color: '#eef0f3' } },
+        timeScale: { timeVisible: true, secondsVisible: true, borderColor: '#d1d4dc' },
+        rightPriceScale: { borderColor: '#d1d4dc' },
         autoSize: true
     });
     lwSeries = lwChart.addCandlestickSeries({
-        upColor: '#00ff66', downColor: '#ff3366',
-        borderUpColor: '#00ff66', borderDownColor: '#ff3366',
-        wickUpColor: '#00ff66', wickDownColor: '#ff3366'
+        upColor: '#26a69a', downColor: '#ef5350',
+        borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+        wickUpColor: '#26a69a', wickDownColor: '#ef5350'
     });
 
     lwSeries.setData(initialCandles);
@@ -801,7 +801,7 @@ function drawTradeLines() {
     const markers = relevant.filter(t => t.status === 'open').map(t => ({
         time: Math.floor((t.createdAt?.toMillis?.() ?? Date.now()) / 1000 / CANDLE_BUCKET_SECONDS) * CANDLE_BUCKET_SECONDS,
         position: t.side === 'buy' ? 'belowBar' : 'aboveBar',
-        color: t.side === 'buy' ? '#00ff66' : '#ff3366',
+        color: t.side === 'buy' ? '#089981' : '#f23645',
         shape: t.side === 'buy' ? 'arrowUp' : 'arrowDown',
         text: `${t.side.toUpperCase()} ${t.lotSize}`
     }));
@@ -809,15 +809,15 @@ function drawTradeLines() {
 
     relevant.forEach(t => {
         lwPriceLines.push(lwSeries.createPriceLine({
-            price: t.entryPrice, color: '#00f3ff', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+            price: t.entryPrice, color: '#2962ff', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
             axisLabelVisible: true, title: t.status === 'pending' ? 'Pending Entry' : `${t.side.toUpperCase()} Entry`
         }));
         if (t.sl) lwPriceLines.push(lwSeries.createPriceLine({
-            price: t.sl, color: '#ff3366', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+            price: t.sl, color: '#f23645', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
             axisLabelVisible: true, title: 'Stop Loss'
         }));
         if (t.tp) lwPriceLines.push(lwSeries.createPriceLine({
-            price: t.tp, color: '#00ff66', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+            price: t.tp, color: '#089981', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
             axisLabelVisible: true, title: 'Take Profit'
         }));
     });

@@ -546,9 +546,6 @@ function renderTrading() {
                 <span id="active-symbol-label" class="font-display font-bold text-lg text-white"></span>
                 <span id="active-symbol-tag" class="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400"></span>
             </div>
-            <div class="text-right">
-                <span id="live-price-display" class="font-mono text-xl font-bold text-neonBlue"></span>
-            </div>
         </div>
         <div id="tv-trading-chart-container" class="h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden bg-white"></div>
     </div>
@@ -710,7 +707,6 @@ function selectTradingPair(pair) {
     });
 
     unsubscribeChartFeed = subscribeLivePrice(pair.symbol, (price) => {
-        document.getElementById('live-price-display').textContent = fmtPrice(pair.symbol, price);
         const tagEl = document.getElementById('active-symbol-tag');
         if (tagEl && isLiveSymbol(pair.symbol) && isMarketOpen(pair.symbol) && tagEl.textContent !== 'LIVE') {
             tagEl.textContent = 'LIVE';

@@ -588,7 +588,7 @@ function renderTrading() {
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-800 text-gray-400">
-                    <tr><th class="p-3 rounded-tl-lg">Symbol</th><th class="p-3">Side</th><th class="p-3">Lot</th><th class="p-3">Entry</th><th class="p-3">SL / TP</th><th class="p-3">P/L</th><th class="p-3 rounded-tr-lg"></th></tr>
+                    <tr><th class="p-3 rounded-tl-lg">Symbol</th><th class="p-3">Side</th><th class="p-3">Lot</th><th class="p-3">Entry</th><th class="p-3">Current Price</th><th class="p-3">SL / TP</th><th class="p-3">P/L</th><th class="p-3 rounded-tr-lg"></th></tr>
                 </thead>
                 <tbody id="open-positions-body" class="divide-y divide-gray-800"></tbody>
             </table>
@@ -826,7 +826,7 @@ function renderTradeTables() {
     const pending = userTrades.filter(t => t.status === 'pending');
     const closed = userTrades.filter(t => t.status === 'closed');
 
-    openBody.innerHTML = open.length === 0 ? `<tr><td colspan="7" class="p-6 text-center text-gray-500">No running positions</td></tr>` : open.map(t => {
+    openBody.innerHTML = open.length === 0 ? `<tr><td colspan="8" class="p-6 text-center text-gray-500">No running positions</td></tr>` : open.map(t => {
         const live = getLivePrice(t.symbol);
         const pnl = pnlFor(t, live);
         return `<tr data-trade-id="${t.id}">
@@ -834,6 +834,7 @@ function renderTradeTables() {
             <td class="p-3 ${t.side === 'buy' ? 'text-neonGreen' : 'text-neonRed'} font-bold">${t.side.toUpperCase()}</td>
             <td class="p-3 font-mono">${t.lotSize}</td>
             <td class="p-3 font-mono">${fmtPrice(t.symbol, t.entryPrice)}</td>
+            <td class="p-3 font-mono price-cell text-neonBlue">${fmtPrice(t.symbol, live)}</td>
             <td class="p-3 font-mono text-xs">${t.sl ? fmtPrice(t.symbol, t.sl) : '\u2014'} / ${t.tp ? fmtPrice(t.symbol, t.tp) : '\u2014'}</td>
             <td class="p-3 font-mono pnl-cell ${pnl >= 0 ? 'text-neonGreen' : 'text-neonRed'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
             <td class="p-3"><button onclick="closeTradeManually('${t.id}')" class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg">Close</button></td>
@@ -872,6 +873,8 @@ function updateOpenPositionsPnlDisplay() {
         if (!trade) return;
         const live = getLivePrice(trade.symbol);
         const pnl = pnlFor(trade, live);
+        const priceCell = row.querySelector('.price-cell');
+        if (priceCell) priceCell.textContent = fmtPrice(trade.symbol, live);
         const cell = row.querySelector('.pnl-cell');
         if (cell) {
             cell.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;

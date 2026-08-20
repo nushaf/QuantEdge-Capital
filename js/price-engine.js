@@ -154,7 +154,7 @@ async function fetchRealAnchors() {
     if (symbols.length === 0) return;
     // Rotate through symbols a few at a time each cycle rather than one giant batch call —
     // spreads load, and one bad symbol/response can't take down every other symbol's update.
-    const batchSize = 4;
+    const batchSize = 7;
     for (let i = 0; i < batchSize; i++) {
         const symbol = symbols[anchorRotationIndex % symbols.length];
         anchorRotationIndex++;
@@ -279,7 +279,7 @@ function ensureRealDataPolling() {
     if (realDataPollingStarted) return;
     realDataPollingStarted = true;
     fetchRealAnchors();
-    setInterval(fetchRealAnchors, 30000); // lighter per-symbol calls now, so a full rotation of all symbols still lands within a couple minutes
+    setInterval(fetchRealAnchors, 20000); // full rotation of all symbols lands within ~40s, keeping cached prices fresh
 }
 
 export function seedRealPrice(symbol, price) {

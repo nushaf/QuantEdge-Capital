@@ -25,7 +25,8 @@ import {
     getPrice as getLivePrice,
     subscribe as subscribeLivePrice,
     isLiveSymbol,
-    isMarketOpen
+    isMarketOpen,
+    refreshPriceBeforeTrade
 } from './price-engine.js';
 
 // Live account data for the logged-in client — starts empty until Firestore loads it
@@ -575,8 +576,8 @@ function renderTrading() {
             </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-            <button onclick="initiateOrder('sell')" class="bg-neonRed bg-opacity-10 hover:bg-neonRed hover:text-white text-neonRed border border-neonRed font-bold py-4 rounded-xl transition-all">SELL</button>
-            <button onclick="initiateOrder('buy')" class="bg-neonGreen bg-opacity-10 hover:bg-neonGreen hover:text-darker text-neonGreen border border-neonGreen font-bold py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(0,255,102,0.15)]">BUY</button>
+            <button onclick="initiateOrder('sell', event)" class="bg-neonRed bg-opacity-10 hover:bg-neonRed hover:text-white text-neonRed border border-neonRed font-bold py-4 rounded-xl transition-all">SELL</button>
+            <button onclick="initiateOrder('buy', event)" class="bg-neonGreen bg-opacity-10 hover:bg-neonGreen hover:text-darker text-neonGreen border border-neonGreen font-bold py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(0,255,102,0.15)]">BUY</button>
         </div>
     </div>
 
@@ -716,7 +717,7 @@ function selectTradingPair(pair) {
     });
 }
 
-window.initiateOrder = (side) => {
+window.initiateOrder = async (side, evt) => {
     if (accountData.balance <= 0) {
         document.getElementById('insufficient-modal-symbol').textContent = activeTradingSymbol.label;
         document.getElementById('insufficient-modal').classList.remove('hidden');
@@ -726,9 +727,17 @@ window.initiateOrder = (side) => {
     const lot = parseFloat(document.getElementById('order-lot').value) || 0.01;
     const sl = parseFloat(document.getElementById('order-sl').value) || null;
     const tp = parseFloat(document.getElementById('order-tp').value) || null;
-    const entryPrice = currentOrderType === 'limit'
-        ? (parseFloat(document.getElementById('order-entry').value) || getLivePrice(activeTradingSymbol.symbol))
-        : getLivePrice(activeTradingSymbol.symbol);
+
+    let entryPrice;
+    if (currentOrderType === 'limit') {
+        entryPrice = parseFloat(document.getElementById('order-entry').value) || getLivePrice(activeTradingSymbol.symbol);
+    } else {
+        // Market order — grab the freshest real price possible right now, not a cached one
+        const btnEl = evt?.target?.closest('button');
+        if (btnEl) { btnEl.dataset.origText = btnEl.innerHTML; btnEl.innerHTML = 'Checking live price...'; btnEl.disabled = true; }
+        entryPrice = await refreshPriceBeforeTrade(activeTradingSymbol.symbol);
+        if (btnEl) { btnEl.innerHTML = btnEl.dataset.origText; btnEl.disabled = false; }
+    }
 
     pendingOrderDraft = { side, lot, sl, tp, entryPrice, orderType: currentOrderType, symbol: activeTradingSymbol.symbol, label: activeTradingSymbol.label };
 

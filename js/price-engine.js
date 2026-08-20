@@ -10,7 +10,7 @@ import { TWELVE_DATA_API_KEY } from './market-data-config.js';
 export const SEED_PRICES = {
     'FX:EURUSD': 1.1570, 'FX:GBPUSD': 1.3500, 'FX:USDJPY': 150.20, 'FX:AUDUSD': 0.6520,
     'FX:USDCAD': 1.3680, 'FX:USDCHF': 0.8815, 'FX:NZDUSD': 0.5990,
-    'TVC:GOLD': 4390.00, 'TVC:SILVER': 52.00, 'TVC:USOIL': 82.40, 'TVC:UKOIL': 86.10,
+    'TVC:GOLD': 4460.00, 'TVC:SILVER': 54.50, 'TVC:USOIL': 82.40, 'TVC:UKOIL': 86.10,
     'TVC:DJI': 53730, 'TVC:NDX': 26730, 'TVC:UKX': 8120, 'TVC:DAX': 18310,
     'NASDAQ:AAPL': 195.40, 'NASDAQ:TSLA': 245.80, 'NASDAQ:NVDA': 120.30,
     'NASDAQ:MSFT': 421.50, 'NASDAQ:AMZN': 182.20, 'NASDAQ:GOOGL': 165.90,
@@ -51,8 +51,6 @@ const TWELVE_DATA_SYMBOL_MAP = {
 const TD_TICKER_TO_SYMBOL = Object.fromEntries(Object.entries(TWELVE_DATA_SYMBOL_MAP).map(([k, v]) => [v, k]));
 const realDataSymbols = new Set(); // populated once a symbol has had at least one successful real fetch
 
-const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
-
 // Real historical 15-minute OHLC candles — used to build the actual chart shape,
 // not just the current price. Crypto via Binance (free, no key), Forex/Gold/Silver/Stocks
 // via Twelve Data (free tier, proxied). Returns null if no real source is available for
@@ -90,10 +88,8 @@ export async function fetchHistoricalCandles(symbol) {
         try {
             const ticker = TWELVE_DATA_SYMBOL_MAP[symbol];
             const targetUrl = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(ticker)}&interval=15min&outputsize=60&apikey=${TWELVE_DATA_API_KEY}`;
-            const res = await fetch(CORS_PROXY + encodeURIComponent(targetUrl));
-            if (!res.ok) return null;
-            const data = await res.json();
-            if (!data.values || !Array.isArray(data.values)) return null;
+            const data = await fetchViaProxies(targetUrl);
+            if (!data || !data.values || !Array.isArray(data.values)) return null;
             return data.values.map(v => ({
                 time: Math.floor(new Date(v.datetime.replace(' ', 'T') + 'Z').getTime() / 1000),
                 open: parseFloat(v.open), high: parseFloat(v.high), low: parseFloat(v.low), close: parseFloat(v.close)
@@ -104,40 +100,65 @@ export async function fetchHistoricalCandles(symbol) {
     return null;
 }
 
+const CORS_PROXIES = [
+    (url) => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(url),
+    (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+];
+
+async function fetchViaProxies(targetUrl) {
+    for (const buildProxyUrl of CORS_PROXIES) {
+        try {
+            const res = await fetch(buildProxyUrl(targetUrl));
+            if (res.ok) return await res.json();
+        } catch (e) { /* try next proxy */ }
+    }
+    return null;
+}
+
+function applyRealPrice(ourSymbol, price) {
+    if (!ourSymbol || isNaN(price) || price <= 0) return false;
+    const firstTime = !realDataSymbols.has(ourSymbol);
+    if (!firstTime) {
+        const prev = currentPrices[ourSymbol];
+        if (prev && Math.abs(price - prev) / prev > 0.08) return false; // reject an implausible jump
+    }
+    realDataSymbols.add(ourSymbol);
+    SEED_PRICES[ourSymbol] = price;
+    currentPrices[ourSymbol] = price;
+    notify(ourSymbol);
+    return true;
+}
+
+// Fetches ONE symbol's real price — far more reliable than one giant batched request,
+// which was silently failing and leaving stale prices in place.
+export async function fetchSingleRealPrice(symbol) {
+    const ticker = TWELVE_DATA_SYMBOL_MAP[symbol];
+    if (!ticker) return false;
+    const targetUrl = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(ticker)}&apikey=${TWELVE_DATA_API_KEY}`;
+    const data = await fetchViaProxies(targetUrl);
+    if (!data) return false;
+    return applyRealPrice(symbol, parseFloat(data.price));
+}
+
+// Called right before a trade executes, so the entry price is the freshest real number we can get.
+export async function refreshPriceBeforeTrade(symbol) {
+    if (TWELVE_DATA_SYMBOL_MAP[symbol]) {
+        await fetchSingleRealPrice(symbol);
+    }
+    return getPrice(symbol);
+}
+
+let anchorRotationIndex = 0;
 async function fetchRealAnchors() {
-    const tickers = Object.values(TWELVE_DATA_SYMBOL_MAP).join(',');
-    const targetUrl = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(tickers)}&apikey=${TWELVE_DATA_API_KEY}`;
-    try {
-        const res = await fetch(CORS_PROXY + encodeURIComponent(targetUrl));
-        if (!res.ok) return;
-        const data = await res.json();
-
-        // Twelve Data returns either a single {price: "..."} object, or (for multi-symbol
-        // requests) an object keyed by ticker — handle both shapes defensively.
-        const entries = data.price !== undefined && Object.keys(TWELVE_DATA_SYMBOL_MAP).length === 1
-            ? [[tickers, data]]
-            : Object.entries(data);
-
-        entries.forEach(([ticker, val]) => {
-            const ourSymbol = TD_TICKER_TO_SYMBOL[ticker];
-            const price = val && parseFloat(val.price);
-            if (ourSymbol && !isNaN(price) && price > 0) {
-                const firstTime = !realDataSymbols.has(ourSymbol);
-                // Reject an implausible jump on refresh (likely bad API response) — but always accept the first real reading
-                if (!firstTime) {
-                    const prev = currentPrices[ourSymbol];
-                    if (prev && Math.abs(price - prev) / prev > 0.05) return;
-                }
-                realDataSymbols.add(ourSymbol);
-                SEED_PRICES[ourSymbol] = price; // simulator drifts toward this real anchor
-                if (firstTime) {
-                    currentPrices[ourSymbol] = price; // snap immediately on first real reading
-                    notify(ourSymbol);
-                }
-            }
-        });
-    } catch (e) {
-        // Silent, graceful degradation — keep using the simulator/last known price if this fails
+    const symbols = Object.keys(TWELVE_DATA_SYMBOL_MAP);
+    if (symbols.length === 0) return;
+    // Rotate through symbols a few at a time each cycle rather than one giant batch call —
+    // spreads load, and one bad symbol/response can't take down every other symbol's update.
+    const batchSize = 4;
+    for (let i = 0; i < batchSize; i++) {
+        const symbol = symbols[anchorRotationIndex % symbols.length];
+        anchorRotationIndex++;
+        await fetchSingleRealPrice(symbol);
     }
 }
 
@@ -258,7 +279,7 @@ function ensureRealDataPolling() {
     if (realDataPollingStarted) return;
     realDataPollingStarted = true;
     fetchRealAnchors();
-    setInterval(fetchRealAnchors, 120000); // stays comfortably within the free tier's daily quota
+    setInterval(fetchRealAnchors, 30000); // lighter per-symbol calls now, so a full rotation of all symbols still lands within a couple minutes
 }
 
 export function seedRealPrice(symbol, price) {

@@ -10,7 +10,7 @@ import { TWELVE_DATA_API_KEY } from './market-data-config.js';
 export const SEED_PRICES = {
     'FX:EURUSD': 1.1570, 'FX:GBPUSD': 1.3500, 'FX:USDJPY': 150.20, 'FX:AUDUSD': 0.6520,
     'FX:USDCAD': 1.3680, 'FX:USDCHF': 0.8815, 'FX:NZDUSD': 0.5990,
-    'TVC:GOLD': 4460.00, 'TVC:SILVER': 54.50, 'TVC:USOIL': 82.40, 'TVC:UKOIL': 86.10,
+    'TVC:GOLD': 4493.00, 'TVC:SILVER': 55.20, 'TVC:USOIL': 82.40, 'TVC:UKOIL': 86.10,
     'TVC:DJI': 53730, 'TVC:NDX': 26730, 'TVC:UKX': 8120, 'TVC:DAX': 18310,
     'NASDAQ:AAPL': 195.40, 'NASDAQ:TSLA': 245.80, 'NASDAQ:NVDA': 120.30,
     'NASDAQ:MSFT': 421.50, 'NASDAQ:AMZN': 182.20, 'NASDAQ:GOOGL': 165.90,
@@ -106,7 +106,8 @@ const CORS_PROXIES = [
 ];
 
 async function fetchViaProxies(targetUrl) {
-    for (const buildProxyUrl of CORS_PROXIES) {
+    const proxies = [...CORS_PROXIES].sort(() => Math.random() - 0.5);
+    for (const buildProxyUrl of proxies) {
         try {
             const res = await fetch(buildProxyUrl(targetUrl));
             if (res.ok) return await res.json();
@@ -154,7 +155,7 @@ async function fetchRealAnchors() {
     if (symbols.length === 0) return;
     // Rotate through symbols a few at a time each cycle rather than one giant batch call —
     // spreads load, and one bad symbol/response can't take down every other symbol's update.
-    const batchSize = 7;
+    const batchSize = 3;
     for (let i = 0; i < batchSize; i++) {
         const symbol = symbols[anchorRotationIndex % symbols.length];
         anchorRotationIndex++;
@@ -279,7 +280,7 @@ function ensureRealDataPolling() {
     if (realDataPollingStarted) return;
     realDataPollingStarted = true;
     fetchRealAnchors();
-    setInterval(fetchRealAnchors, 20000); // full rotation of all symbols lands within ~40s, keeping cached prices fresh
+    setInterval(fetchRealAnchors, 45000); // slower, gentler pace — avoids tripping the free proxy's rate limits
 }
 
 export function seedRealPrice(symbol, price) {

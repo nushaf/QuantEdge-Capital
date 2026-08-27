@@ -1124,7 +1124,7 @@ function renderProfile() {
         <button id="save-profile-btn" onclick="saveProfileInfo()" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Save Changes</button>
     </div>
 
-    <div class="glass-panel p-8 rounded-2xl">
+    <div id="kyc-section" class="glass-panel p-8 rounded-2xl">
         <div class="flex items-center justify-between mb-2">
             <h3 class="font-display font-bold text-lg">KYC Verification</h3>
             ${profileData.kycStatus === 'verified' ? `
@@ -1136,7 +1136,7 @@ function renderProfile() {
                 <span class="text-xs font-bold px-3 py-1 rounded-full bg-neonGold/10 text-neonGold">Pending Review</span>
             ` : ''}
         </div>
-        <p class="text-gray-400 text-sm mb-6">Upload both sides of a valid ID document to verify your account.</p>
+        <p class="text-gray-400 text-sm mb-6">Upload both sides of a valid ID document to verify your account. Verification is required before making a deposit.</p>
         <div class="mb-4">
             <label class="block text-sm text-gray-400 mb-2">Document Type</label>
             <select id="kyc-type" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
@@ -1148,18 +1148,38 @@ function renderProfile() {
             <div>
                 <label class="block text-sm text-gray-400 mb-2">Front Side</label>
                 <input id="kyc-front-input" type="file" accept="image/*" class="w-full text-sm text-gray-400 mb-3 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-neonBlue file:text-darker file:font-bold hover:file:bg-opacity-80 file:cursor-pointer cursor-pointer">
-                ${profileData.kycFrontImage ? `<img src="${profileData.kycFrontImage}" class="w-full rounded-xl border border-gray-700">` : ''}
+                ${profileData.kycFrontImage ? `
+                <button onclick="openKycLightbox('front')" class="w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-700 hover:border-neonBlue transition-all text-left">
+                    <svg class="w-5 h-5 text-neonBlue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span class="text-sm text-gray-300 truncate">Front_ID_Document.jpg</span>
+                    <span class="text-xs text-gray-500 ml-auto flex-shrink-0">View</span>
+                </button>` : ''}
             </div>
             <div>
                 <label class="block text-sm text-gray-400 mb-2">Back Side</label>
                 <input id="kyc-back-input" type="file" accept="image/*" class="w-full text-sm text-gray-400 mb-3 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-neonBlue file:text-darker file:font-bold hover:file:bg-opacity-80 file:cursor-pointer cursor-pointer">
-                ${profileData.kycBackImage ? `<img src="${profileData.kycBackImage}" class="w-full rounded-xl border border-gray-700">` : ''}
+                ${profileData.kycBackImage ? `
+                <button onclick="openKycLightbox('back')" class="w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-700 hover:border-neonBlue transition-all text-left">
+                    <svg class="w-5 h-5 text-neonBlue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span class="text-sm text-gray-300 truncate">Back_ID_Document.jpg</span>
+                    <span class="text-xs text-gray-500 ml-auto flex-shrink-0">View</span>
+                </button>` : ''}
             </div>
         </div>
         <button id="save-kyc-btn" onclick="uploadKycDocument()" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Upload Documents</button>
     </div>
     `;
 }
+
+window.openKycLightbox = (side) => {
+    const src = side === 'front' ? profileData.kycFrontImage : profileData.kycBackImage;
+    if (!src) return;
+    document.getElementById('client-lightbox-img').src = src;
+    document.getElementById('client-image-lightbox').classList.remove('hidden');
+};
+window.closeClientLightbox = () => {
+    document.getElementById('client-image-lightbox').classList.add('hidden');
+};
 
 function escapeAttr(str) {
     return (str || '').replace(/"/g, '&quot;');
@@ -1538,7 +1558,21 @@ function showDepositStep(n) {
     });
 }
 
+function requiresKycVerification() {
+    if (profileData.kycStatus !== 'verified') {
+        showToast('Verify your account before depositing', 'info');
+        window.loadPage('profile');
+        setTimeout(() => {
+            const kycSection = document.getElementById('kyc-section');
+            if (kycSection) kycSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 250);
+        return true;
+    }
+    return false;
+}
+
 window.openDepositModal = () => {
+    if (requiresKycVerification()) return;
     depositState = { amount: 0, method: null };
     document.getElementById('deposit-amount').value = '';
     document.getElementById('deposit-proof-preview').classList.add('hidden');

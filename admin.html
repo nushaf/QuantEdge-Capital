@@ -37,6 +37,7 @@
                 <button id="tab-clients" onclick="switchTab('clients')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Clients</button>
                 <button id="tab-requests" onclick="switchTab('requests')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Requests</button>
                 <button id="tab-trading" onclick="switchTab('trading')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Trading</button>
+                <button id="tab-reviews" onclick="switchTab('reviews')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Trade Reviews</button>
                 <button id="tab-settings" onclick="switchTab('settings')" class="px-5 py-2 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">Payment Settings</button>
             </div>
         </div>
@@ -82,6 +83,12 @@
                 <div id="trading-positions-list" class="space-y-4"></div>
                 <p id="trading-positions-empty" class="text-gray-500 text-center py-16 hidden">This client has no running positions.</p>
             </div>
+        </div>
+
+        <div id="panel-reviews" class="hidden">
+            <input id="reviews-search" type="text" placeholder="Search by client name or email..." class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none mb-6">
+            <div id="reviews-list" class="space-y-4"></div>
+            <p id="reviews-empty" class="text-gray-500 text-center py-16 hidden">No trade review requests yet.</p>
         </div>
 
         <div id="panel-settings" class="hidden">
@@ -193,6 +200,38 @@
                 <button onclick="closeKycModal()" class="flex-1 border border-gray-600 text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-800 transition-all">Close</button>
                 <button onclick="rejectKyc()" class="flex-1 bg-neonRed/10 border border-neonRed text-neonRed font-bold py-3 rounded-xl hover:bg-neonRed hover:text-white transition-all">Reject</button>
                 <button onclick="verifyKyc()" class="flex-1 bg-neonGreen/10 border border-neonGreen text-neonGreen font-bold py-3 rounded-xl hover:bg-neonGreen hover:text-darker transition-all">Verify</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trade review detail modal -->
+    <div id="review-modal" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div class="flex items-start justify-between gap-4 mb-6">
+                <div>
+                    <h3 id="review-modal-name" class="font-display font-bold text-xl"></h3>
+                    <p id="review-modal-email" class="text-neonBlue text-sm font-mono"></p>
+                </div>
+                <button onclick="closeReviewModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+                <div><p class="text-gray-500 text-xs">Platform / broker</p><p id="review-modal-platform" class="text-white"></p></div>
+                <div><p class="text-gray-500 text-xs">What happened</p><p id="review-modal-issue" class="text-white"></p></div>
+                <div><p class="text-gray-500 text-xs">Amount involved</p><p id="review-modal-amount" class="text-white"></p></div>
+                <div><p class="text-gray-500 text-xs">Started</p><p id="review-modal-start" class="text-white"></p></div>
+                <div><p class="text-gray-500 text-xs">Time on platform</p><p id="review-modal-duration" class="text-white"></p></div>
+                <div><p class="text-gray-500 text-xs">Submitted</p><p id="review-modal-time" class="text-white"></p></div>
+            </div>
+            <p class="text-gray-500 text-xs mb-1">Their experience</p>
+            <p id="review-modal-experience" class="text-gray-300 text-sm mb-6 whitespace-pre-line"></p>
+            <p class="text-gray-500 text-xs mb-2">Proof uploaded (click to enlarge)</p>
+            <div id="review-modal-proofs" class="flex flex-wrap gap-3 mb-6"></div>
+            <div class="border-t border-gray-800 pt-5">
+                <label class="block text-sm text-gray-400 mb-2">Your reply (shown to the client)</label>
+                <textarea id="review-reply-text" rows="4" class="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none resize-none mb-3"></textarea>
+                <button id="review-reply-btn" onclick="sendReviewReply()" class="bg-neonBlue text-darker font-bold px-6 py-2.5 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all text-sm">Send Reply</button>
             </div>
         </div>
     </div>

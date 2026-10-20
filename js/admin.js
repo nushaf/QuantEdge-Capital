@@ -36,7 +36,7 @@ function trashIconBtn(collectionName, id, extraClass = '') {
 }
 
 window.deleteRecord = async (collectionName, id) => {
-    const labels = { messages: 'this message', transactions: 'this request', users: "this client's account data" };
+    const labels = { messages: 'this message', transactions: 'this request', users: "this client's account data", tradeReviews: 'this trade review request' };
     const confirmed = window.confirm(`Delete ${labels[collectionName] || 'this record'}? This only removes it from your admin dashboard and cannot be undone.`);
     if (!confirmed) return;
 
@@ -49,8 +49,8 @@ window.deleteRecord = async (collectionName, id) => {
 };
 
 window.switchTab = (tab) => {
-    const tabs = { inbox: 'tab-inbox', clients: 'tab-clients', requests: 'tab-requests', trading: 'tab-trading', settings: 'tab-settings' };
-    const panels = { inbox: 'panel-inbox', clients: 'panel-clients', requests: 'panel-requests', trading: 'panel-trading', settings: 'panel-settings' };
+    const tabs = { inbox: 'tab-inbox', clients: 'tab-clients', requests: 'tab-requests', trading: 'tab-trading', reviews: 'tab-reviews', settings: 'tab-settings' };
+    const panels = { inbox: 'panel-inbox', clients: 'panel-clients', requests: 'panel-requests', trading: 'panel-trading', reviews: 'panel-reviews', settings: 'panel-settings' };
 
     Object.keys(tabs).forEach((key) => {
         const tabEl = document.getElementById(tabs[key]);
@@ -91,6 +91,7 @@ onAuthStateChanged(auth, (user) => {
     listenForRequests();
     loadPaymentSettings();
     initTradingTab();
+    listenForTradeReviews();
 });
 
 let allMessages = [];
@@ -698,3 +699,132 @@ window.confirmAdminCloseTrade = async () => {
         btn.disabled = false;
     }
 };
+
+// ---------- Trade Review requests ----------
+let allReviews = [];
+let currentReviewId = null;
+
+function listenForTradeReviews() {
+    const q = query(collection(db, 'tradeReviews'), orderBy('createdAt', 'desc'));
+    onSnapshot(q, (snapshot) => {
+        allReviews = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderReviews();
+        // keep an open detail modal in sync (e.g. after sending a reply)
+        if (currentReviewId && !document.getElementById('review-modal').classList.contains('hidden')) {
+            const r = allReviews.find(x => x.id === currentReviewId);
+            if (r) fillReviewModal(r);
+        }
+    });
+    document.getElementById('reviews-search').addEventListener('input', renderReviews);
+}
+
+function renderReviews() {
+    const list = document.getElementById('reviews-list');
+    const empty = document.getElementById('reviews-empty');
+    const term = (document.getElementById('reviews-search').value || '').trim().toLowerCase();
+
+    const filtered = term
+        ? allReviews.filter(r => (r.userName || '').toLowerCase().includes(term) || (r.userEmail || '').toLowerCase().includes(term))
+        : allReviews;
+
+    list.innerHTML = '';
+    if (filtered.length === 0) {
+        empty.textContent = term ? 'No requests found for that client.' : 'No trade review requests yet.';
+        empty.classList.remove('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+
+    filtered.forEach((r) => {
+        const replied = !!r.reply;
+        const time = r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toLocaleString() : 'Just now';
+        const card = document.createElement('div');
+        card.className = 'glass-panel p-6 rounded-2xl flex items-center justify-between gap-4 reveal';
+        card.innerHTML = `
+            <div class="review-open cursor-pointer flex-1 min-w-0">
+                <h3 class="font-display font-bold text-lg truncate">${escapeHtml(r.userName || 'Unnamed client')}</h3>
+                <p class="text-neonBlue text-sm font-mono truncate">${escapeHtml(r.userEmail || '')}</p>
+                <p class="text-gray-500 text-xs mt-1">${escapeHtml(r.platform || '')} · ${escapeHtml(r.issueType || '')} · ${time}</p>
+            </div>
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <span class="text-xs font-bold px-3 py-1 rounded-full ${replied ? 'bg-neonGreen/10 text-neonGreen' : 'bg-neonGold/10 text-neonGold'}">${replied ? 'Replied' : 'New'}</span>
+                ${trashIconBtn('tradeReviews', r.id)}
+            </div>
+        `;
+        card.querySelector('.review-open').addEventListener('click', () => openReviewModal(r.id));
+        list.appendChild(card);
+    });
+}
+
+function fillReviewModal(r) {
+    document.getElementById('review-modal-name').textContent = r.userName || 'Unnamed client';
+    document.getElementById('review-modal-email').textContent = r.userEmail || '';
+    document.getElementById('review-modal-platform').textContent = r.platform || '-';
+    document.getElementById('review-modal-issue').textContent = r.issueType || '-';
+    document.getElementById('review-modal-amount').textContent = `${r.currency || ''} ${r.amount ?? ''}`.trim() || '-';
+    document.getElementById('review-modal-start').textContent = r.startDate || '-';
+    document.getElementById('review-modal-duration').textContent = r.duration || '-';
+    document.getElementById('review-modal-time').textContent = r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toLocaleString() : '-';
+    document.getElementById('review-modal-experience').textContent = r.experience || '';
+
+    const proofs = document.getElementById('review-modal-proofs');
+    proofs.innerHTML = '';
+    const images = r.images || [];
+    if (images.length === 0) {
+        proofs.innerHTML = '<p class="text-gray-500 text-sm">No proof uploaded.</p>';
+    } else {
+        images.forEach((src, i) => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = (r.imageNames && r.imageNames[i]) || `Proof ${i + 1}`;
+            img.title = img.alt;
+            img.className = 'w-24 h-24 object-cover rounded-xl border border-gray-700 cursor-zoom-in hover:opacity-80 transition-opacity';
+            img.addEventListener('click', () => window.openLightbox(src));
+            proofs.appendChild(img);
+        });
+    }
+
+    const replyBox = document.getElementById('review-reply-text');
+    if (document.activeElement !== replyBox) replyBox.value = r.reply || '';
+}
+
+function openReviewModal(id) {
+    const r = allReviews.find(x => x.id === id);
+    if (!r) return;
+    currentReviewId = id;
+    fillReviewModal(r);
+    document.getElementById('review-reply-text').value = r.reply || '';
+    document.getElementById('review-modal').classList.remove('hidden');
+}
+
+window.closeReviewModal = () => {
+    currentReviewId = null;
+    document.getElementById('review-modal').classList.add('hidden');
+};
+
+window.sendReviewReply = async () => {
+    if (!currentReviewId) return;
+    const text = document.getElementById('review-reply-text').value.trim();
+    if (!text) {
+        showToast('Write a reply first', 'error');
+        return;
+    }
+    const btn = document.getElementById('review-reply-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Sending...';
+    btn.disabled = true;
+    try {
+        await updateDoc(doc(db, 'tradeReviews', currentReviewId), {
+            reply: text,
+            status: 'replied',
+            repliedAt: serverTimestamp()
+        });
+        showToast('Reply sent. The client will see it in their Trade Review page.', 'success');
+    } catch (err) {
+        showToast('Could not send reply. Please try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+

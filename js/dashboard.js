@@ -81,6 +81,7 @@ const pages = {
     algo: { icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', title: 'Algo Trading' },
     marketupdates: { icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', title: 'Market Updates' },
     transactions: { icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', title: 'Transaction History' },
+    tradereview: { icon: 'M9 12l2 2 4-4M7 4h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z', title: 'Trade Review' },
     profile: { icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', title: 'Profile' },
     security: { icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', title: 'Security Settings' },
     support: { icon: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z', title: 'Support' }
@@ -300,6 +301,7 @@ window.loadPage = function loadPage(page, event = null) {
         else if(page === 'profile') content.innerHTML = renderProfile();
         else if(page === 'security') content.innerHTML = renderSecurity();
         else if(page === 'support') content.innerHTML = renderSupport();
+        else if(page === 'tradereview') content.innerHTML = renderTradeReview();
         else content.innerHTML = renderPlaceholder(page);
         
         // Re-init charts / live widgets if needed (script tags inside innerHTML never auto-execute)
@@ -309,6 +311,7 @@ window.loadPage = function loadPage(page, event = null) {
         if(page === 'profile') initProfilePage();
         if(page === 'security') initSecurityPage();
         if(page === 'support') initSupportPage();
+        if(page === 'tradereview') initTradeReviewPage();
 
         // Fade in
         content.classList.remove('opacity-0');
@@ -1368,6 +1371,200 @@ window.sendSecurityPasswordReset = () => {
         showToast('Could not send reset email. Please try again.', 'error');
     });
 };
+
+// ---------- Trade Review requests ----------
+let unsubscribeTradeReviews = null;
+let tradeReviewDocs = {};
+
+function trEsc(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderTradeReview() {
+    const inputCls = 'w-full px-4 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none';
+    return `
+    <div class="glass-panel p-8 rounded-2xl max-w-3xl mb-8">
+        <h3 class="font-display font-bold text-xl mb-2">Request a Trade Review</h3>
+        <p class="text-gray-400 text-sm mb-6">Tell us what happened and share any supporting documents. Our analysts will review your case and reply here with risk-management feedback. This is a review and coaching service. No outcome or return of funds is guaranteed.</p>
+        <form id="trade-review-form" class="space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Platform or broker name</label>
+                    <input id="tr-platform" type="text" required class="${inputCls}">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">What happened?</label>
+                    <select id="tr-issue" required class="${inputCls}">
+                        <option value="Trading losses">Trading losses</option>
+                        <option value="Withdrawal delays">Withdrawal delays</option>
+                        <option value="Suspected fake platform">Suspected fake platform</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Approximate amount involved</label>
+                    <div class="flex gap-2">
+                        <input id="tr-amount" type="number" min="0" step="0.01" required class="${inputCls}">
+                        <select id="tr-currency" class="px-3 py-3 rounded-xl border border-gray-700 bg-[rgba(255,255,255,0.03)] focus:border-neonBlue outline-none">
+                            <option>USD</option><option>EUR</option><option>GBP</option><option>SGD</option><option>LKR</option><option>INR</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">When did it start?</label>
+                    <input id="tr-start-date" type="date" required class="${inputCls}">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">How long did you use the platform?</label>
+                    <select id="tr-duration" required class="${inputCls}">
+                        <option value="Under 1 month">Under 1 month</option>
+                        <option value="1 to 6 months">1 to 6 months</option>
+                        <option value="6 to 12 months">6 to 12 months</option>
+                        <option value="Over a year">Over a year</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Your experience and any message to us</label>
+                <textarea id="tr-experience" rows="5" required class="${inputCls} resize-none"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-400 mb-2">Upload proof (up to 3 images: statements, screenshots, chats)</label>
+                <input id="tr-proofs" type="file" accept="image/*" multiple class="w-full text-sm text-gray-400 mb-2 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-neonBlue file:text-darker file:font-bold hover:file:bg-opacity-80 file:cursor-pointer cursor-pointer">
+                <p id="tr-file-names" class="text-xs text-gray-500"></p>
+            </div>
+            <label class="flex items-start gap-3 text-sm text-gray-400 cursor-pointer">
+                <input id="tr-ack" type="checkbox" required class="mt-1 rounded border-gray-600 bg-transparent">
+                <span>I understand this is a review and coaching request, and no outcome or return of funds is guaranteed.</span>
+            </label>
+            <button type="submit" class="bg-neonBlue text-darker font-bold px-8 py-3 rounded-xl hover:shadow-[0_0_15px_rgba(0,243,255,0.4)] transition-all">Submit Request</button>
+        </form>
+    </div>
+
+    <div class="max-w-3xl">
+        <h3 class="font-display font-bold text-lg mb-4">Your Submissions</h3>
+        <div id="tr-history" class="space-y-4"><p class="text-gray-500 text-sm">Loading...</p></div>
+    </div>
+    `;
+}
+
+function initTradeReviewPage() {
+    const form = document.getElementById('trade-review-form');
+    const fileInput = document.getElementById('tr-proofs');
+    const namesEl = document.getElementById('tr-file-names');
+
+    if (fileInput) {
+        fileInput.addEventListener('change', () => {
+            const files = Array.from(fileInput.files);
+            namesEl.textContent = files.map(f => f.name).join(', ');
+            if (files.length > 3) showToast('Maximum 3 files. Only the first 3 will be uploaded.', 'info');
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Submitting...';
+            btn.disabled = true;
+
+            try {
+                const files = Array.from(fileInput.files).slice(0, 3);
+                const images = [];
+                for (const f of files) images.push(await compressImage(f, 650, 0.5));
+                if (images.reduce((n, s) => n + s.length, 0) > 800000) {
+                    showToast('Images are too large. Please upload smaller screenshots.', 'error');
+                    return;
+                }
+
+                const fullName = (profileData.firstName || profileData.lastName)
+                    ? `${profileData.firstName} ${profileData.lastName}`.trim()
+                    : (auth.currentUser?.displayName || currentUserEmail);
+
+                await addDoc(collection(db, 'tradeReviews'), {
+                    userId: currentUserId,
+                    userEmail: currentUserEmail,
+                    userName: fullName,
+                    platform: document.getElementById('tr-platform').value.trim(),
+                    issueType: document.getElementById('tr-issue').value,
+                    amount: parseFloat(document.getElementById('tr-amount').value) || 0,
+                    currency: document.getElementById('tr-currency').value,
+                    startDate: document.getElementById('tr-start-date').value,
+                    duration: document.getElementById('tr-duration').value,
+                    experience: document.getElementById('tr-experience').value.trim(),
+                    images,
+                    imageNames: files.map(f => f.name),
+                    status: 'submitted',
+                    reply: null,
+                    createdAt: serverTimestamp()
+                });
+                showToast('Request submitted. Our team will reply here.', 'success');
+                form.reset();
+                namesEl.textContent = '';
+            } catch (err) {
+                showToast(err.message || 'Could not submit. Please try again.', 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        });
+    }
+
+    if (unsubscribeTradeReviews) unsubscribeTradeReviews();
+    const q = query(collection(db, 'tradeReviews'), where('userId', '==', currentUserId));
+    unsubscribeTradeReviews = onSnapshot(q, (snapshot) => {
+        const el = document.getElementById('tr-history');
+        if (!el) return;
+
+        const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+        tradeReviewDocs = {};
+        docs.forEach(d => { tradeReviewDocs[d.id] = d; });
+
+        if (docs.length === 0) {
+            el.innerHTML = '<p class="text-gray-500 text-sm">No submissions yet.</p>';
+            return;
+        }
+
+        el.innerHTML = docs.map(r => {
+            const dateStr = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString() : '';
+            const replied = !!r.reply;
+            const proofs = (r.images || []).map((_, i) => `
+                <button data-id="${r.id}" data-idx="${i}" class="tr-proof-btn flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-700 hover:border-neonBlue transition-all text-xs text-gray-300">
+                    <svg class="w-4 h-4 text-neonBlue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    ${trEsc((r.imageNames && r.imageNames[i]) || ('Proof ' + (i + 1)))}
+                </button>`).join('');
+            return `
+            <div class="glass-panel p-5 rounded-xl">
+                <div class="flex items-center justify-between gap-3 mb-2">
+                    <p class="font-bold text-white text-sm">${trEsc(r.platform)} <span class="text-gray-500 font-normal">· ${trEsc(r.issueType)}</span></p>
+                    <span class="text-xs font-bold px-3 py-1 rounded-full ${replied ? 'bg-neonGreen/10 text-neonGreen' : 'bg-neonGold/10 text-neonGold'}">${replied ? 'Replied' : 'Under review'}</span>
+                </div>
+                <p class="text-xs text-gray-500 mb-3">${dateStr} · ${trEsc(r.currency)} ${trEsc(r.amount)} · started ${trEsc(r.startDate)} · used ${trEsc(r.duration)}</p>
+                <p class="text-gray-300 text-sm mb-3 whitespace-pre-line">${trEsc(r.experience)}</p>
+                ${proofs ? `<div class="flex flex-wrap gap-2 mb-3">${proofs}</div>` : ''}
+                ${replied ? `
+                <div class="border-t border-gray-800 pt-3 mt-3">
+                    <p class="text-xs text-neonBlue font-bold mb-1">Reply from admin</p>
+                    <p class="text-gray-300 text-sm whitespace-pre-line">${trEsc(r.reply)}</p>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+
+        el.querySelectorAll('.tr-proof-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const r = tradeReviewDocs[btn.dataset.id];
+                const src = r && r.images && r.images[parseInt(btn.dataset.idx, 10)];
+                if (!src) return;
+                document.getElementById('client-lightbox-img').src = src;
+                document.getElementById('client-image-lightbox').classList.remove('hidden');
+            });
+        });
+    });
+}
 
 function renderSupport() {
     return `
